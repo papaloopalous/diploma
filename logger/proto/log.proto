@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package logservice;
+
+option go_package = "/logservice";
+
+message LogRequest {
+    string service = 1;   // Имя микросервиса
+    string level = 2;     // Уровень (INFO, ERROR)
+    string message = 3;   // Текст лога
+    map<string, string> metadata = 5; // Дополнительные данные (IP, user_id и т.д.)
+}
+
+message LogResponse {
+    bool success = 1;
+}
+
+service LogService {
+    rpc WriteLog(LogRequest) returns (LogResponse);
+}
