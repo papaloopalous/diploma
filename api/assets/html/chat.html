@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Простой чат</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; }
+        #chat-box { 
+            width: 80%; 
+            height: 300px; 
+            border: 1px solid #000; 
+            overflow-y: auto; 
+            margin: 10px auto; 
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+        }
+        .message {
+            max-width: 70%;
+            padding: 8px 12px;
+            margin: 5px;
+            border-radius: 10px;
+            word-wrap: break-word;
+        }
+        .sent {
+            align-self: flex-end;
+            background-color: #0084ff;
+            color: white;
+        }
+        .received {
+            align-self: flex-start;
+            background-color: #f1f1f1;
+            color: black;
+        }
+        #message { width: 60%; padding: 5px; }
+        #send { padding: 5px 10px; }
+    </style>
+</head>
+<body>
+    <h1>WebSocket Чат</h1>
+    <div id="chat-box"></div>
+    <input type="text" id="message" placeholder="Введите сообщение...">
+    <button id="send">Отправить</button>
+
+    <script>
+        let ws = new WebSocket("ws://localhost:1488/ws");
+
+        ws.onopen = () => {
+            console.log("Соединение установлено.");
+        };
+
+        ws.onmessage = (event) => {
+            let chatBox = document.getElementById("chat-box");
+            let msg = document.createElement("div");
+            msg.textContent = event.data;
+            msg.classList.add("message", "received");
+            chatBox.appendChild(msg);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        };
+
+        ws.onclose = () => {
+            console.log("Соединение закрыто.");
+        };
+
+        document.getElementById("send").addEventListener("click", () => {
+            let messageInput = document.getElementById("message");
+            let message = messageInput.value;
+            if (message) {
+                let chatBox = document.getElementById("chat-box");
+
+                // Отображаем отправленное сообщение справа
+                let sentMsg = document.createElement("div");
+                sentMsg.textContent = message;
+                sentMsg.classList.add("message", "sent");
+                chatBox.appendChild(sentMsg);
+                chatBox.scrollTop = chatBox.scrollHeight;
+
+                // Отправляем сообщение серверу
+                ws.send(message);
+                messageInput.value = "";
+            }
+        });
+    </script>
+</body>
+</html>

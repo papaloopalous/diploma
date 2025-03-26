@@ -35,7 +35,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }).toString();
     }
 
-    async function handleSubmit(event, endpoint, usernameId, passwordId) {
+    async function handleSubmit(event, endpoint, usernameId, passwordId, roleId = null) {
         event.preventDefault();
         
         const key = await getEncryptionKey();
@@ -47,10 +47,20 @@ document.addEventListener("DOMContentLoaded", () => {
         const encryptedUsername = await encryptData(username, key);
         const encryptedPassword = await encryptData(password, key);
 
+        const payload = {
+            username: encryptedUsername,
+            password: encryptedPassword
+        };
+
+        if (roleId) {
+            const role = document.getElementById(roleId).value;
+            payload.role = role;
+        }
+
         fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: encryptedUsername, password: encryptedPassword })
+            body: JSON.stringify(payload)
         });
     }
 
@@ -59,6 +69,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     document.querySelector("#registerForm form").addEventListener("submit", function(event) {
-        handleSubmit(event, '/api/register', 'registerUsername', 'registerPassword');
+        handleSubmit(event, '/api/register', 'registerUsername', 'registerPassword', 'registerRole');
     });
 });
