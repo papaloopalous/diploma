@@ -17,11 +17,17 @@ func init() {
 func CreateNewRouter() *mux.Router {
 	userRepo := repo.NewUserRepo()
 	sessionRepo := repo.NewSessionRepo()
+	taskRepo := repo.NewTaskRepo()
 
 	authHandler := &handlers.AuthHandler{
 		User:    userRepo,
 		Token:   tokenRepo,
 		Session: sessionRepo,
+	}
+
+	taskHandler := &handlers.TaskHandler{
+		User:  userRepo,
+		Tasks: taskRepo,
 	}
 
 	router := mux.NewRouter()
@@ -39,6 +45,11 @@ func CreateNewRouter() *mux.Router {
 	//router.HandleFunc("/api/createUser", handlers.CreateUser).Methods("POST")
 
 	router.HandleFunc("/chat", handlers.OutChat)
+
+	router.HandleFunc("/task", handlers.OutTask)
+
+	router.HandleFunc("/upload-task", taskHandler.UploadFile)
+	router.HandleFunc("/download-task", taskHandler.DownloadFile)
 
 	return router
 }

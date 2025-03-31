@@ -15,6 +15,9 @@ type UserData struct {
 	age       []uint8
 	specialty []string
 	id        []uuid.UUID
+	price     []int
+	teachers  [][]uuid.UUID
+	students  [][]uuid.UUID
 }
 
 type UserRepo interface {

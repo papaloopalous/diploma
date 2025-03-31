@@ -16,7 +16,7 @@ type SessionData struct {
 }
 
 type SessionRepo interface {
-	GetSession(sessionID uuid.UUID) (userID uuid.UUID, role string, expiresAt time.Time, err error)
+	GetSession(sessionID uuid.UUID) (userID uuid.UUID, role string, err error)
 	SetSession(sessionID uuid.UUID, userID uuid.UUID, role string)
 	DeleteSession(sessionID uuid.UUID) (userID uuid.UUID, err error)
 }
@@ -32,8 +32,9 @@ func NewSessionRepo() *SessionData {
 	}
 }
 
-func (p *SessionData) GetSession(sessionID uuid.UUID) (userID uuid.UUID, role string, expiresAt time.Time, err error) {
+func (p *SessionData) GetSession(sessionID uuid.UUID) (userID uuid.UUID, role string, err error) {
 	found := false
+	var expiresAt time.Time
 
 	for i, val := range p.id {
 		if val == sessionID {
@@ -46,9 +47,9 @@ func (p *SessionData) GetSession(sessionID uuid.UUID) (userID uuid.UUID, role st
 	}
 
 	if found && expiresAt.Compare(time.Now()) == 1 {
-		return userID, role, expiresAt, nil
+		return userID, role, nil
 	} else {
-		return userID, role, expiresAt, errors.New(errlist.ErrNoSession)
+		return userID, role, errors.New(errlist.ErrNoSession)
 	}
 }
 

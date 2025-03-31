@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Загрузка и скачивание задания</title>
+  <!-- Подключаем fflate через CDN -->
+  <script src="https://unpkg.com/fflate@0.7.4/umd/index.js"></script>
+</head>
+<body>
+  <h1>📤 Загрузка задания</h1>
+
+  <label for="studentID">Student ID (UUID):</label><br />
+  <input type="text" id="studentID" placeholder="например, cc1a56e2-0f5f-4a17-9f5e-caf58f2c62e3"><br />
+
+  <label for="taskName">Task Name:</label><br />
+  <input type="text" id="taskName" placeholder="например, Моя работа"><br />
+
+  <label for="fileInput">Файл (.docx):</label><br />
+  <input type="file" id="fileInput" accept=".docx"><br><br>
+
+  <button onclick="uploadFile()">📤 Загрузить</button>
+
+  <hr>
+
+  <h2>📥 Скачать задание</h2>
+  <label for="taskID">Task ID (UUID):</label><br />
+  <input type="text" id="taskID" placeholder="например, d4c3c8e2-..."><br><br>
+
+  <button onclick="downloadFile()">📥 Скачать</button>
+
+  <script>
+    // Ограничение по размеру файла: 10 МБ (10 * 1024 * 1024 байт)
+    const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+    async function uploadFile() {
+      const studentID = document.getElementById("studentID").value.trim();
+      const taskName = document.getElementById("taskName").value.trim();
+      const fileInput = document.getElementById("fileInput");
+
+      if (!studentID || !taskName || fileInput.files.length === 0) {
+        alert("Заполните все поля и выберите файл");
+        return;
+      }
+
+      const file = fileInput.files[0];
+
+      if (file.size > MAX_FILE_SIZE) {
+        alert("Размер файла превышает допустимый лимит 10 МБ");
+        return;
+      }
+
+      let arrayBuffer;
+      try {
+        arrayBuffer = await file.arrayBuffer();
+      } catch (err) {
+        alert("Ошибка чтения файла: " + err.message);
+        return;
+      }
+
+      const uint8 = new Uint8Array(arrayBuffer);
+      let compressed;
+      try {
+        compressed = fflate.gzipSync(uint8);
+      } catch (err) {
+        alert("Ошибка сжатия файла: " + err.message);
+        return;
+      }
+
+      try {
+        const response = await fetch("/upload-task", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/octet-stream",
+            "studentID": studentID,
+            "taskName": taskName,
+            "fileName": file.name
+          },
+          body: compressed
+        });
+        const text = await response.text();
+        alert("Ответ сервера:\n" + text);
+      } catch (err) {
+        alert("Ошибка при отправке файла: " + err.message);
+      }
+    }
+
+    async function downloadFile() {
+      const taskID = document.getElementById("taskID").value.trim();
+      if (!taskID) {
+        alert("Введите taskID");
+        return;
+      }
+
+      try {
+        const res = await fetch(`/download-task?taskID=${encodeURIComponent(taskID)}`);
+        if (!res.ok) {
+          const msg = await res.text();
+          alert("Ошибка при загрузке:\n" + msg);
+          return;
+        }
+
+        const fileName = getFileNameFromContentDisposition(res.headers.get("Content-Disposition")) || "file.docx";
+        const compressedBuffer = await res.arrayBuffer();
+        const compressed = new Uint8Array(compressedBuffer);
+
+        let uncompressed;
+        try {
+          uncompressed = fflate.gunzipSync(compressed);
+        } catch (err) {
+          alert("Ошибка распаковки файла: " + err.message);
+          return;
+        }
+
+        const blob = new Blob([uncompressed]);
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = fileName;
+        a.click();
+      } catch (err) {
+        alert("Ошибка при загрузке файла: " + err.message);
+      }
+    }
+
+    function getFileNameFromContentDisposition(header) {
+      if (!header) return null;
+      const match = header.match(/filename="?([^"]+)"?/);
+      return match ? match[1] : null;
+    }
+  </script>
+</body>
+</html>

@@ -16,4 +16,8 @@ const (
 	ErrNoCookie        = "no cookie was found"
 	ErrTokenParse      = "failed to parse a jwt token"
 	ErrSesDelete       = "failed to delete a session"
+	ErrNoPermission    = "you do not have permission"
+	ErrNoTask          = "specified task was not found"
+	ErrNoHeaders       = "missing headers"
+	ErrReadingBody     = "failed to read the body"
 )
