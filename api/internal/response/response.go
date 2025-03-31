@@ -25,3 +25,10 @@ func APIRespond(w http.ResponseWriter, code int, message string, details string,
 
 	loggergrpc.LC.Log("api", resType, message, map[string]string{"code": strconv.Itoa(code), "details": details})
 }
+
+func RespondWithJSON(w http.ResponseWriter, statusCode int, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	err := json.NewEncoder(w).Encode(data)
+	APIRespond(w, http.StatusInternalServerError, "error marshalling", err.Error(), "ERROR")
+}

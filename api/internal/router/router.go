@@ -48,7 +48,7 @@ func CreateNewRouter() *mux.Router {
 
 	router.HandleFunc("/task", handlers.OutTask)
 
-	router.HandleFunc("/upload-task", taskHandler.UploadFile)
+	router.HandleFunc("/upload-task", taskHandler.CreateTask)
 	router.HandleFunc("/download-task", taskHandler.DownloadFile)
 
 	return router
