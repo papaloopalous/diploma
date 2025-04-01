@@ -20,14 +20,16 @@ type UserData struct {
 	teachers  [][]uuid.UUID
 	students  [][]uuid.UUID
 	rating    []float32
+	requests  [][]uuid.UUID
 }
 
 type usersList struct {
-	Fio       string  `json:"fio"`
-	Age       uint8   `json:"age"`
-	Specialty string  `json:"specialty,omitempty"`
-	Price     int     `json:"price,omitempty"`
-	Rating    float32 `json:"rating"`
+	ID        uuid.UUID `json:"id"`
+	Fio       string    `json:"fio"`
+	Age       uint8     `json:"age"`
+	Specialty string    `json:"specialty,omitempty"`
+	Price     int       `json:"price,omitempty"`
+	Rating    float32   `json:"rating"`
 }
 
 type UserRepo interface {
@@ -118,6 +120,7 @@ func (p *UserData) OutAscendingBySpecialty(orderField string, specialty string) 
 	for i := range p.fio {
 		if (specialty == "" || p.specialty[i] == specialty) && p.role[i] == "teacher" {
 			users = append(users, usersList{
+				ID:        p.id[i],
 				Fio:       p.fio[i],
 				Age:       p.age[i],
 				Specialty: p.specialty[i],
@@ -146,6 +149,7 @@ func (p *UserData) OutDescendingBySpecialty(orderField string, specialty string)
 	for i := range p.fio {
 		if (specialty == "" || p.specialty[i] == specialty) && p.role[i] == "teacher" {
 			users = append(users, usersList{
+				ID:        p.id[i],
 				Fio:       p.fio[i],
 				Age:       p.age[i],
 				Specialty: p.specialty[i],
@@ -206,6 +210,7 @@ func (p *UserData) StudentsByTeacher(teacherID uuid.UUID) (users []usersList) {
 		for i, val1 := range p.id {
 			if val1 == val {
 				users = append(users, usersList{
+					ID:     p.id[i],
 					Fio:    p.fio[i],
 					Age:    p.age[i],
 					Rating: p.rating[i],
@@ -226,3 +231,22 @@ func (p *UserData) EditGrade(studentID uuid.UUID, grade float32) {
 		}
 	}
 }
+
+func (p *UserData) AddRequest(studentID uuid.UUID, teacherID uuid.UUID) {
+	for i, val := range p.id {
+		if val == teacherID && p.role[i] == "teacher" {
+			p.requests[i] = append(p.requests[i], studentID)
+			break
+		}
+	}
+
+	for i, val := range p.id {
+		if val == studentID {
+			p.requests[i] = append(p.requests[i], teacherID)
+			return
+		}
+	}
+
+}
+
+//func (p *UserData) Accept()

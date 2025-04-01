@@ -41,6 +41,11 @@ func CreateNewRouter() *mux.Router {
 	router.HandleFunc("/api/logout", authHandler.LogOUT).Methods("DELETE")
 
 	router.HandleFunc("/", handlers.OutIndex)
+	router.HandleFunc("/register.html", handlers.OutRegister)        // страница регистрации
+	router.HandleFunc("/login.html", handlers.OutLogin)              // страница входа
+	router.HandleFunc("/fill-profile.html", handlers.OutFillProfile) // страница профиля
+	router.HandleFunc("/main.html", handlers.OutMain)                // главная после входа
+	router.HandleFunc("/task.html", handlers.OutTask)
 
 	//router.HandleFunc("/api/createUser", handlers.CreateUser).Methods("POST")
 

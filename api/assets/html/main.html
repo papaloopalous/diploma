@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Личный кабинет</title>
+</head>
+<body>
+  <h1>Главная страница</h1>
+
+  <nav>
+    <!-- Меню для преподавателя -->
+    <div id="menuTeacher" style="display:none;">
+      <button onclick="showSection('studentsSection')">Мои студенты</button>
+      <button onclick="showSection('tasksSection')">Мои задания</button>
+      <button onclick="showSection('profileSection')">Мой профиль</button>
+    </div>
+    <!-- Меню для студента -->
+    <div id="menuStudent" style="display:none;">
+      <button onclick="showSection('allTeachersSection')">Все преподаватели</button>
+      <button onclick="showSection('myTeachersSection')">Мои преподаватели</button>
+      <button onclick="showSection('tasksSection')">Мои задания</button>
+      <button onclick="showSection('profileSection')">Мой профиль</button>
+    </div>
+  </nav>
+  <hr/>
+
+  <!-- Преподаватель -->
+  <div id="studentsSection" class="section" style="display:none;">
+    <h2>Мои студенты</h2>
+    <div id="studentsList"></div>
+  </div>
+
+  <!-- Общая для всех: Задания -->
+  <div id="tasksSection" class="section" style="display:none;">
+    <h2>Мои задания</h2>
+    <div id="tasksList"></div>
+  </div>
+
+  <!-- Общая для всех: Профиль -->
+  <div id="profileSection" class="section" style="display:none;">
+    <h2>Мой профиль</h2>
+    <div id="profileInfo"></div>
+  </div>
+
+  <!-- Студент -->
+  <div id="allTeachersSection" class="section" style="display:none;">
+    <h2>Все преподаватели</h2>
+    <label>Поле для сортировки:</label>
+    <select id="sortField">
+      <option value="rating">Рейтинг</option>
+      <option value="price">Цена</option>
+    </select>
+    <label>Порядок:</label>
+    <select id="sortOrder">
+      <option value="asc">По возрастанию</option>
+      <option value="desc">По убыванию</option>
+    </select>
+    <button onclick="loadAllTeachers()">Применить</button>
+    <div id="allTeachersList"></div>
+  </div>
+
+  <div id="myTeachersSection" class="section" style="display:none;">
+    <h2>Мои преподаватели</h2>
+    <div id="myTeachersList"></div>
+  </div>
+
+  <script>
+    function normalizeResponse(resp) {
+      if (resp.INFO) {
+        return {
+          code: 'INFO',
+          statusCode: resp.INFO.code,
+          message: resp.INFO.message,
+          ...resp.INFO // чтобы вытащить usersList, taskList, если есть
+        };
+      }
+      if (resp.ERROR) {
+        return {
+          code: 'ERROR',
+          statusCode: resp.ERROR.code,
+          message: resp.ERROR.message,
+          ...resp.ERROR
+        };
+      }
+      return { code: 'UNKNOWN', statusCode: 0, message: 'Неизвестный ответ' };
+    }
+
+    function getCookie(name) {
+      const matches = document.cookie.match(new RegExp(
+        '(?:^|; )' + name.replace(/([\.$?*|{}\(\)\[\]\\\/\+^])/g, '\\$1') + '=([^;]*)'
+      ));
+      return matches ? decodeURIComponent(matches[1]) : undefined;
+    }
+    const userRole = getCookie('userRole'); // Если HttpOnly=false
+    if (userRole === 'teacher') {
+      document.getElementById('menuTeacher').style.display = 'block';
+    } else {
+      document.getElementById('menuStudent').style.display = 'block';
+    }
+
+    function showSection(id) {
+      document.querySelectorAll('.section').forEach(s => s.style.display = 'none');
+      document.getElementById(id).style.display = 'block';
+
+      if (id === 'studentsSection') loadStudents();
+      else if (id === 'tasksSection') loadTasks();
+      else if (id === 'profileSection') loadProfile();
+      else if (id === 'allTeachersSection') loadAllTeachers();
+      else if (id === 'myTeachersSection') loadMyTeachers();
+    }
+
+    // Преподаватель -> Мои студенты
+    async function loadStudents() {
+      try {
+        const res = await fetch('/api/get-students', {
+          credentials: 'include'
+        });
+        const raw = await res.json();
+        const result = normalizeResponse(raw);
+        if (result.code === 'ERROR') {
+          alert('Ошибка: ' + result.message + ' (код ' + result.statusCode + ')');
+          return;
+        }
+        renderStudents(result.usersList || []);
+      } catch (err) {
+        alert('Ошибка сети: ' + err.message);
+      }
+    }
+
+    function renderStudents(users) {
+      const container = document.getElementById('studentsList');
+      container.innerHTML = '';
+      if (!users.length) {
+        container.textContent = 'Нет студентов';
+        return;
+      }
+      users.forEach(u => {
+        const div = document.createElement('div');
+        div.textContent = `ФИО: ${u.fio}, Возраст: ${u.age}`;
+
+        // "Добавить задание"
+        const btnTask = document.createElement('button');
+        btnTask.textContent = 'Добавить задание';
+        btnTask.onclick = () => addTaskForStudent(u);
+
+        // "Начать чат"
+        const btnChat = document.createElement('button');
+        btnChat.textContent = 'Начать чат';
+        btnChat.onclick = () => alert('Чат пока не реализован');
+
+        div.appendChild(document.createElement('br'));
+        div.appendChild(btnTask);
+        div.appendChild(btnChat);
+        container.appendChild(div);
+        container.appendChild(document.createElement('hr'));
+      });
+    }
+
+    function addTaskForStudent(student) {
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = '.docx';
+      fileInput.onchange = async e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        // При желании — сжатие fflate (см. task.html)
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('studentID', student.id);
+        formData.append('taskName', file.name);
+
+        try {
+          const resp = await fetch('/upload-task', {
+            method: 'POST',
+            credentials: 'include',
+            body: formData
+          });
+          const text = await resp.text();
+          alert('Ответ сервера:\n' + text);
+        } catch (err) {
+          alert('Ошибка загрузки файла: ' + err.message);
+        }
+      };
+      fileInput.click();
+    }
+
+    // Общие: Задания
+    async function loadTasks() {
+      try {
+        const res = await fetch('/api/get-tasks', {
+          credentials: 'include'
+        });
+        const raw = await res.json();
+        const result = normalizeResponse(raw);
+        if (result.code === 'ERROR') {
+          alert('Ошибка: ' + result.message + ' (код ' + result.statusCode + ')');
+          return;
+        }
+        renderTasks(result.taskList || []);
+      } catch (err) {
+        alert('Ошибка сети: ' + err.message);
+      }
+    }
+
+    function renderTasks(tasks) {
+      const container = document.getElementById('tasksList');
+      container.innerHTML = '';
+      if (!tasks.length) {
+        container.textContent = 'Заданий нет';
+        return;
+      }
+      tasks.forEach(t => {
+        let info = `Название: ${t.taskName}, Статус: ${t.status}`;
+        if (typeof t.grade !== 'undefined') {
+          info += `, Оценка: ${t.grade}`;
+        }
+        const div = document.createElement('div');
+        div.textContent = info;
+        container.appendChild(div);
+        container.appendChild(document.createElement('hr'));
+      });
+    }
+
+    // Общие: Профиль
+    async function loadProfile() {
+      try {
+        const res = await fetch('/api/get-profile', {
+          credentials: 'include'
+        });
+        const raw = await res.json();
+        const result = normalizeResponse(raw);
+        if (result.code === 'ERROR') {
+          alert('Ошибка: ' + result.message + ' (код ' + result.statusCode + ')');
+          return;
+        }
+        renderProfile(result.userList || {});
+      } catch (err) {
+        alert('Ошибка сети: ' + err.message);
+      }
+    }
+
+    function renderProfile(user) {
+      const container = document.getElementById('profileInfo');
+      container.innerHTML = '';
+      if (!user.fio) {
+        container.textContent = 'Профиль не заполнен';
+        return;
+      }
+      let info = `ФИО: ${user.fio}, Возраст: ${user.age}`;
+      if (user.specialty) info += `, Специализация: ${user.specialty}`;
+      if (typeof user.price !== 'undefined') info += `, Цена: ${user.price}`;
+      if (typeof user.rating !== 'undefined') info += `, Рейтинг: ${user.rating}`;
+      container.textContent = info;
+    }
+
+    // Студент -> Все преподаватели
+    async function loadAllTeachers() {
+      const sortField = document.getElementById('sortField').value;
+      const sortOrder = document.getElementById('sortOrder').value;
+
+      try {
+        const res = await fetch('/api/get-teachers', {
+          credentials: 'include'
+        });
+        const raw = await res.json();
+        const result = normalizeResponse(raw);
+        if (result.code === 'ERROR') {
+          alert('Ошибка: ' + result.message + ' (код ' + result.statusCode + ')');
+          return;
+        }
+        let teachers = result.usersList || [];
+        teachers.sort((a,b) => {
+          if (sortOrder === 'asc') return a[sortField] - b[sortField];
+          return b[sortField] - a[sortField];
+        });
+        renderAllTeachers(teachers);
+      } catch (err) {
+        alert('Ошибка сети: ' + err.message);
+      }
+    }
+
+    function renderAllTeachers(teachers) {
+      const container = document.getElementById('allTeachersList');
+      container.innerHTML = '';
+      if (!teachers.length) {
+        container.textContent = 'Нет преподавателей';
+        return;
+      }
+      teachers.forEach(t => {
+        const div = document.createElement('div');
+        div.textContent = `ФИО: ${t.fio}, Возраст: ${t.age}, Цена: ${t.price}, Рейтинг: ${t.rating}`;
+        
+        const btnReq = document.createElement('button');
+        btnReq.textContent = 'Отправить заявку';
+        btnReq.onclick = () => sendRequestToTeacher(t);
+
+        div.appendChild(document.createElement('br'));
+        div.appendChild(btnReq);
+        container.appendChild(div);
+        container.appendChild(document.createElement('hr'));
+      });
+    }
+
+    async function sendRequestToTeacher(teacher) {
+      try {
+        const res = await fetch('/api/send-request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ teacherID: teacher.id })
+        });
+        const raw = await res.json();
+        const result = normalizeResponse(raw);
+        if (result.code === 'ERROR') {
+          alert('Ошибка: ' + result.message + ' (код ' + result.statusCode + ')');
+        } else if (result.code === 'INFO') {
+          alert('Заявка отправлена!');
+        } else {
+          alert(result.message);
+        }
+      } catch (err) {
+        alert('Ошибка сети: ' + err.message);
+      }
+    }
+
+    // Студент -> Мои преподаватели
+    async function loadMyTeachers() {
+      try {
+        const res = await fetch('/api/get-my-teachers', {
+          credentials: 'include'
+        });
+        const raw = await res.json();
+        const result = normalizeResponse(raw);
+        if (result.code === 'ERROR') {
+          alert('Ошибка: ' + result.message + ' (код ' + result.statusCode + ')');
+          return;
+        }
+        renderMyTeachers(result.usersList || []);
+      } catch (err) {
+        alert('Ошибка сети: ' + err.message);
+      }
+    }
+
+    function renderMyTeachers(teachers) {
+      const container = document.getElementById('myTeachersList');
+      container.innerHTML = '';
+      if (!teachers.length) {
+        container.textContent = 'Преподавателей нет';
+        return;
+      }
+      teachers.forEach(t => {
+        const div = document.createElement('div');
+        div.textContent = `ФИО: ${t.fio}, Возраст: ${t.age}`;
+        
+        const btnChat = document.createElement('button');
+        btnChat.textContent = 'Начать чат';
+        btnChat.onclick = () => alert('Чат не реализован');
+
+        div.appendChild(document.createElement('br'));
+        div.appendChild(btnChat);
+        container.appendChild(div);
+        container.appendChild(document.createElement('hr'));
+      });
+    }
+  </script>
+</body>
+</html>

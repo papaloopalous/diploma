@@ -59,6 +59,16 @@ func (p *AuthHandler) LogIN(w http.ResponseWriter, r *http.Request) {
 		Name:     "authToken",
 		Value:    token,
 		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Path:     "/",
+	})
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "userRole",
+		Value:    userRole,
+		HttpOnly: false,
+		SameSite: http.SameSiteLaxMode,
+		Path:     "/",
 	})
 
 	response.APIRespond(w, http.StatusOK, "user authenticated", "id:"+userID.String(), "INFO")
@@ -107,6 +117,16 @@ func (p *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		Name:     "authToken",
 		Value:    token,
 		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Path:     "/",
+	})
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "userRole",
+		Value:    role,
+		HttpOnly: false,
+		SameSite: http.SameSiteLaxMode,
+		Path:     "/",
 	})
 
 	response.APIRespond(w, http.StatusCreated, "user authenticated", "id:"+userID.String(), "INFO")
@@ -136,6 +156,17 @@ func (p *AuthHandler) LogOUT(w http.ResponseWriter, r *http.Request) {
 		Value:    "",
 		HttpOnly: true,
 		MaxAge:   -1,
+		SameSite: http.SameSiteLaxMode,
+		Path:     "/",
+	})
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "userRole",
+		Value:    "",
+		HttpOnly: false,
+		MaxAge:   -1,
+		SameSite: http.SameSiteLaxMode,
+		Path:     "/",
 	})
 
 	response.APIRespond(w, http.StatusOK, "user has logged out", "id:"+userID.String(), "INFO")

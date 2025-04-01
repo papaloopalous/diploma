@@ -1,45 +1,13 @@
+<!-- index.html -->
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login & Register</title>
-    <link rel="stylesheet" href="/assets/css/style.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
-    <script defer src="/assets/js/script.js"></script>
+  <meta charset="UTF-8" />
+  <title>Главная страница</title>
 </head>
 <body>
-    <div class="container">
-        <h2>Welcome</h2>
-        <div class="btn-group">
-            <button id="showLogin">Login</button>
-            <button id="showRegister">Register</button>
-        </div>
-        
-        <div id="loginForm" class="form-container hidden">
-            <h2>Login</h2>
-            <form>
-                <input type="text" id="loginUsername" placeholder="Username" required>
-                <input type="password" id="loginPassword" placeholder="Password" required>
-                <button type="submit">Login</button>
-            </form>
-        </div>
-        
-        <div id="registerForm" class="form-container hidden">
-            <h2>Register</h2>
-            <form>
-                <input type="text" id="registerUsername" placeholder="Username" required>
-                <input type="password" id="registerPassword" placeholder="Password" required>
-
-                <select id="registerRole" required>
-                    <option value="" disabled selected>Select role</option>
-                    <option value="student">Student</option>
-                    <option value="teacher">Teacher</option>
-                </select>
-
-                <button type="submit">Register</button>
-            </form>
-        </div>
-    </div>
+  <h1>Добро пожаловать</h1>
+  <button onclick="window.location.href='login.html'">Войти</button>
+  <button onclick="window.location.href='register.html'">Зарегистрироваться</button>
 </body>
 </html>

@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Регистрация</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+</head>
+<body>
+  <h1>Регистрация</h1>
+  <form id="registerForm">
+    <label>Логин:</label><br>
+    <input type="text" id="registerUsername" required><br>
+
+    <label>Пароль:</label><br>
+    <input type="password" id="registerPassword" required><br><br>
+
+    <label>Роль:</label><br>
+    <select id="registerRole" required>
+      <option value="" disabled selected>Выберите роль</option>
+      <option value="student">Студент</option>
+      <option value="teacher">Преподаватель</option>
+    </select><br><br>
+
+    <button type="submit">Зарегистрироваться</button>
+  </form>
+
+  <script>
+    // Нормализуем ответ сервера
+    function normalizeResponse(resp) {
+      if (resp.INFO) {
+        return {
+          code: 'INFO',
+          statusCode: resp.INFO.code,
+          message: resp.INFO.message
+        };
+      }
+      if (resp.ERROR) {
+        return {
+          code: 'ERROR',
+          statusCode: resp.ERROR.code,
+          message: resp.ERROR.message
+        };
+      }
+      return {
+        code: 'UNKNOWN',
+        statusCode: 0,
+        message: 'Неизвестный формат ответа сервера'
+      };
+    }
+
+    // Кэшируем ключ
+    let encryptionKey = null;
+
+    async function getEncryptionKey() {
+      if (encryptionKey) return encryptionKey;
+      try {
+        const resp = await fetch('/api/encryption-key', {
+          credentials: 'include'
+        });
+        if (!resp.ok) throw new Error("Ключ не получен");
+        encryptionKey = await resp.text();
+        return encryptionKey;
+      } catch (err) {
+        console.error('Ошибка при получении ключа шифрования:', err);
+        return null;
+      }
+    }
+
+    async function encryptData(data, key) {
+      if (!key) return null;
+      const keyUtf8 = CryptoJS.enc.Base64.parse(key);
+      return CryptoJS.AES.encrypt(data, keyUtf8, {
+        mode: CryptoJS.mode.ECB,
+        padding: CryptoJS.pad.Pkcs7
+      }).toString();
+    }
+
+    document.getElementById('registerForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const username = document.getElementById('registerUsername').value.trim();
+      const password = document.getElementById('registerPassword').value.trim();
+      const role = document.getElementById('registerRole').value;
+
+      const key = await getEncryptionKey();
+      if (!key) {
+        alert('Ошибка: не удалось получить ключ шифрования');
+        return;
+      }
+
+      const encryptedUsername = await encryptData(username, key);
+      const encryptedPassword = await encryptData(password, key);
+
+      try {
+        const response = await fetch('/api/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            username: encryptedUsername,
+            password: encryptedPassword,
+            role: role
+          })
+        });
+
+        const raw = await response.json();
+        const result = normalizeResponse(raw);
+
+        console.log('Ответ сервера:', result); // ← для отладки
+
+        if (result.code === 'INFO') {
+          window.location.href = 'fill-profile.html';
+        } else {
+          alert('Ошибка: ' + result.message + ' (код ' + result.statusCode + ')');
+        }
+
+      } catch (err) {
+        alert('Сетевая ошибка: ' + err.message);
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Вход</title>
+  <!-- Подключаем CryptoJS для AES -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+</head>
+<body>
+  <h1>Войти</h1>
+  <form id="loginForm">
+    <label>Логин:</label><br>
+    <input type="text" id="loginUsername" required><br>
+    <label>Пароль:</label><br>
+    <input type="password" id="loginPassword" required><br><br>
+    <button type="submit">Войти</button>
+  </form>
+
+  <script>
+    function normalizeResponse(resp) {
+      if (resp.INFO) {
+        return {
+          code: 'INFO',
+          statusCode: resp.INFO.code,
+          message: resp.INFO.message
+        };
+      }
+      if (resp.ERROR) {
+        return {
+          code: 'ERROR',
+          statusCode: resp.ERROR.code,
+          message: resp.ERROR.message
+        };
+      }
+      return {
+        code: 'UNKNOWN',
+        statusCode: 0,
+        message: 'Неизвестный формат ответа сервера'
+      };
+    }
+
+    let encryptionKey = null;
+
+    async function getEncryptionKey() {
+      if (encryptionKey) return encryptionKey;
+      try {
+        const res = await fetch('/api/encryption-key', {
+          credentials: 'include'
+        });
+        if (!res.ok) throw new Error('Не удалось получить ключ шифрования');
+        encryptionKey = await res.text();
+        return encryptionKey;
+      } catch (err) {
+        console.error(err);
+        return null;
+      }
+    }
+
+    async function encryptData(data, key) {
+      if (!key) return null;
+      const keyUtf8 = CryptoJS.enc.Base64.parse(key);
+      return CryptoJS.AES.encrypt(data, keyUtf8, {
+        mode: CryptoJS.mode.ECB,
+        padding: CryptoJS.pad.Pkcs7
+      }).toString();
+    }
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const username = document.getElementById('loginUsername').value.trim();
+      const password = document.getElementById('loginPassword').value.trim();
+
+      const key = await getEncryptionKey();
+      if (!key) return alert('Ошибка: не удалось получить ключ шифрования');
+
+      const encryptedUsername = await encryptData(username, key);
+      const encryptedPassword = await encryptData(password, key);
+
+      try {
+        const response = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            username: encryptedUsername,
+            password: encryptedPassword
+          })
+        });
+        const raw = await response.json();
+        const result = normalizeResponse(raw);
+
+        console.log('Login result:', result);
+
+        if (result.code === 'INFO') {
+          window.location.href = 'main.html';
+        } else {
+          alert('Ошибка: ' + result.message + ' (код ' + result.statusCode + ')');
+        }
+      } catch (err) {
+        alert('Сетевая ошибка: ' + err.message);
+      }
+    });
+  </script>
+</body>
+</html>
