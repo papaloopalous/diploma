@@ -63,9 +63,56 @@ func (p *UserHandler) OutAllStudents(w http.ResponseWriter, r *http.Request) {
 	response.RespondWithJSON(w, http.StatusOK, p.User.StudentsByTeacher(teacherID))
 }
 
-func (p *UserHandler) AddRequest(w http.ResponseWriter, r *http.Request) {}
+func (p *UserHandler) AddRequest(w http.ResponseWriter, r *http.Request) {
+	teacherIDStr := r.URL.Query().Get("teacherID")
+	if teacherIDStr == "" {
+		response.APIRespond(w, http.StatusBadRequest, "incomplete query", "", "ERROR")
+		return
+	}
 
-func (p *UserHandler) ConfirmRequest(w http.ResponseWriter, r *http.Request) {}
+	teacherID := uuid.MustParse(teacherIDStr)
+	studentID := middleware.GetContext(r.Context())
+
+	p.User.AddRequest(studentID, teacherID)
+
+	response.APIRespond(w, http.StatusCreated, "request added", "from "+studentID.String()+" to "+teacherID.String(), "INFO")
+}
+
+func (p *UserHandler) ConfirmRequest(w http.ResponseWriter, r *http.Request) {
+	studentIDStr := r.URL.Query().Get("studentID")
+	if studentIDStr == "" {
+		response.APIRespond(w, http.StatusBadRequest, "incomplete query", "", "ERROR")
+		return
+	}
+
+	studentID := uuid.MustParse(studentIDStr)
+	teacherID := middleware.GetContext(r.Context())
+
+	p.User.Accept(studentID, teacherID)
+
+	response.APIRespond(w, http.StatusCreated, "request accepted", "from "+studentID.String()+" to "+teacherID.String(), "INFO")
+}
+
+func (p *UserHandler) DenyRequest(w http.ResponseWriter, r *http.Request) {
+	studentIDStr := r.URL.Query().Get("studentID")
+	if studentIDStr == "" {
+		response.APIRespond(w, http.StatusBadRequest, "incomplete query", "", "ERROR")
+		return
+	}
+
+	studentID := uuid.MustParse(studentIDStr)
+	teacherID := middleware.GetContext(r.Context())
+
+	p.User.Deny(studentID, teacherID)
+
+	response.APIRespond(w, http.StatusCreated, "request denied", "from "+studentID.String()+" to "+teacherID.String(), "INFO")
+}
+
+func (p *UserHandler) OutRequests(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetContext(r.Context())
+
+	response.RespondWithJSON(w, http.StatusOK, p.User.ShowRequests(userID))
+}
 
 func (p *UserHandler) FillProfile(w http.ResponseWriter, r *http.Request) {
 	var user repo.UsersList
@@ -92,4 +139,10 @@ func (p *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.RespondWithJSON(w, http.StatusOK, user)
+}
+
+func (p *UserHandler) OutMyTeachers(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetContext(r.Context())
+
+	response.RespondWithJSON(w, http.StatusOK, p.User.TeachersByStudent(userID))
 }

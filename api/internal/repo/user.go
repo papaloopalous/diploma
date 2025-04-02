@@ -43,6 +43,11 @@ type UserRepo interface {
 	StudentsByTeacher(teacherID uuid.UUID) (users []UsersList)
 	EditGrade(studentID uuid.UUID, grade float32)
 	FillProfile(userID uuid.UUID, userData UsersList)
+	TeachersByStudent(studentID uuid.UUID) (teachers []UsersList)
+	AddRequest(studentID uuid.UUID, teacherID uuid.UUID)
+	ShowRequests(userID uuid.UUID) (students []UsersList)
+	Accept(teacherID uuid.UUID, studentID uuid.UUID)
+	Deny(teacherID uuid.UUID, studentID uuid.UUID)
 }
 
 var _ UserRepo = &UserData{}
@@ -77,6 +82,9 @@ func (p *UserData) CreateAccount(username string, pass string, role string) (use
 	p.price = append(p.price, 0)
 	p.rating = append(p.rating, 0)
 	p.specialty = append(p.specialty, "")
+	p.teachers = append(p.teachers, []uuid.UUID{})
+	p.students = append(p.students, []uuid.UUID{})
+	p.requests = append(p.requests, []uuid.UUID{})
 
 	return userID, nil
 }
@@ -187,6 +195,7 @@ func (p *UserData) AddRating(userID uuid.UUID, rating uint8) {
 	for i, val := range p.id {
 		if val == userID {
 			p.rating[i] = (p.rating[i] + float32(rating)) / 2
+			break
 		}
 	}
 }
@@ -210,7 +219,6 @@ func (p *UserData) StudentsByTeacher(teacherID uuid.UUID) (users []UsersList) {
 					Age:    p.age[i],
 					Rating: p.rating[i],
 				})
-				break
 			}
 		}
 	}
@@ -244,9 +252,72 @@ func (p *UserData) AddRequest(studentID uuid.UUID, teacherID uuid.UUID) {
 
 }
 
-//func (p *UserData) Accept()
+func (p *UserData) Accept(teacherID uuid.UUID, studentID uuid.UUID) {
+	var requests []uuid.UUID
+	var index int
 
-//func (p *UserData) Deny()
+	for i, val := range p.id {
+		if val == teacherID {
+			requests = p.requests[i]
+			index = i
+			break
+		}
+	}
+
+	for i, val := range requests {
+		if val == studentID {
+			p.students[index] = append(p.students[index], val)
+			requests = append(requests[:i], requests[i+1:]...)
+			p.requests[index] = requests
+			break
+		}
+	}
+}
+
+func (p *UserData) Deny(teacherID uuid.UUID, studentID uuid.UUID) {
+	var requests []uuid.UUID
+	var index int
+
+	for i, val := range p.id {
+		if val == teacherID {
+			requests = p.requests[i]
+			index = i
+			break
+		}
+	}
+
+	for i, val := range requests {
+		if val == studentID {
+			requests = append(requests[:i], requests[i+1:]...)
+			p.requests[index] = requests
+			break
+		}
+	}
+}
+
+func (p *UserData) ShowRequests(userID uuid.UUID) (students []UsersList) {
+	var studentsList []uuid.UUID
+
+	for i, val := range p.id {
+		if val == userID {
+			studentsList = p.requests[i]
+			break
+		}
+	}
+
+	for i := range studentsList {
+		students = append(students, UsersList{
+			ID:        p.id[i],
+			Fio:       p.fio[i],
+			Age:       p.age[i],
+			Specialty: p.specialty[i],
+			Price:     p.price[i],
+			Rating:    p.rating[i],
+		})
+	}
+
+	return students
+}
 
 func (p *UserData) FillProfile(userID uuid.UUID, userData UsersList) {
 	for i, val := range p.id {
@@ -255,6 +326,31 @@ func (p *UserData) FillProfile(userID uuid.UUID, userData UsersList) {
 			p.fio[i] = userData.Fio
 			p.specialty[i] = userData.Specialty
 			p.price[i] = userData.Price
+			break
 		}
 	}
+}
+
+func (p *UserData) TeachersByStudent(studentID uuid.UUID) (teachers []UsersList) {
+	var teachersList []uuid.UUID
+
+	for i, val := range p.id {
+		if val == studentID {
+			teachersList = p.teachers[i]
+			break
+		}
+	}
+
+	for i := range teachersList {
+		teachers = append(teachers, UsersList{
+			ID:        p.id[i],
+			Fio:       p.fio[i],
+			Age:       p.age[i],
+			Specialty: p.specialty[i],
+			Price:     p.price[i],
+			Rating:    p.rating[i],
+		})
+	}
+
+	return teachers
 }

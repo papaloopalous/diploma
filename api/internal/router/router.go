@@ -51,27 +51,40 @@ func CreateNewRouter() *mux.Router {
 	router.HandleFunc("/api/register", authHandler.Register).Methods("POST")
 	router.HandleFunc("/api/logout", authHandler.LogOUT).Methods("DELETE")
 
+	//for all users
+	userRouter := router.NewRoute().Subrouter()
+	userRouter.Use(middlewareHandler.CheckAny)
+	userRouter.HandleFunc("/api/fill-profile", userHandler.FillProfile).Methods("POST")
+	userRouter.HandleFunc("/api/get-profile", userHandler.GetProfile).Methods("GET")
+	userRouter.HandleFunc("/api/get-tasks", taskHandler.OutAllTasks).Methods("GET")
+
+	//for students
+	studentRouter := router.NewRoute().Subrouter()
+	studentRouter.Use(middlewareHandler.CheckStudent)
+	studentRouter.HandleFunc("/api/get-teachers", userHandler.OutAllTeachers).Methods("GET")
+	studentRouter.HandleFunc("/api/get-my-teachers", userHandler.OutMyTeachers).Methods("GET")
+	studentRouter.HandleFunc("/api/send-request", userHandler.AddRequest).Methods("POST")
+
+	//for teachers
+	teacherRouter := router.NewRoute().Subrouter()
+	teacherRouter.Use(middlewareHandler.CheckTeacher)
+	teacherRouter.HandleFunc("/api/get-students", userHandler.OutAllStudents).Methods("GET")
+	teacherRouter.HandleFunc("/api/get-requests", userHandler.OutRequests).Methods("GET")
+	teacherRouter.HandleFunc("/api/confirm", userHandler.ConfirmRequest).Methods("POST")
+	teacherRouter.HandleFunc("/api/deny", userHandler.DenyRequest).Methods("POST")
+
+	router.HandleFunc("/upload-task", taskHandler.CreateTask)
+	router.HandleFunc("/download-task", taskHandler.DownloadFile)
+
+	//static
 	router.HandleFunc("/", handlers.OutIndex)
 	router.HandleFunc("/register.html", handlers.OutRegister)
 	router.HandleFunc("/login.html", handlers.OutLogin)
 	router.HandleFunc("/fill-profile.html", handlers.OutFillProfile)
 	router.HandleFunc("/main.html", handlers.OutMain)
 	router.HandleFunc("/task.html", handlers.OutTask)
-
-	userRouter := router.NewRoute().Subrouter()
-	userRouter.Use(middlewareHandler.CheckTeacher)
-	userRouter.HandleFunc("/api/fill-profile", userHandler.FillProfile).Methods("POST")
-
-	userRouter.HandleFunc("/api/get-profile", userHandler.GetProfile).Methods("GET")
-
-	//router.HandleFunc("/api/createUser", handlers.CreateUser).Methods("POST")
-
 	router.HandleFunc("/chat", handlers.OutChat)
-
 	router.HandleFunc("/task", handlers.OutTask)
-
-	router.HandleFunc("/upload-task", taskHandler.CreateTask)
-	router.HandleFunc("/download-task", taskHandler.DownloadFile)
 
 	return router
 }

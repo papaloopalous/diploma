@@ -40,7 +40,7 @@ func (p *MiddlewareHandler) CheckSes(w http.ResponseWriter, r *http.Request, nex
 		return
 	}
 
-	if role != targetRole {
+	if role != targetRole && targetRole != "any" {
 		response.APIRespond(w, http.StatusUnauthorized, errlist.ErrNoPermission, "id: "+userID.String(), "ERROR")
 		return
 	}
@@ -55,6 +55,10 @@ func (p *MiddlewareHandler) CheckStudent(next http.Handler) http.Handler {
 
 func (p *MiddlewareHandler) CheckTeacher(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { p.CheckSes(w, r, next, "teacher") })
+}
+
+func (p *MiddlewareHandler) CheckAny(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { p.CheckSes(w, r, next, "any") })
 }
 
 func GetContext(ctx context.Context) (userID uuid.UUID) {
