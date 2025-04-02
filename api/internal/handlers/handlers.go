@@ -17,7 +17,7 @@ func EncryptionKey(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(base64.StdEncoding.EncodeToString(key)))
 }
 
-func serveHTML(w http.ResponseWriter, r *http.Request, filename string) {
+func serveHTML(w http.ResponseWriter, _ *http.Request, filename string) {
 	tmpl, err := template.ParseFiles("assets/html/" + filename)
 	if err != nil {
 		response.APIRespond(w, http.StatusInternalServerError, err.Error(), "", "ERROR")

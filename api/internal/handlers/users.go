@@ -4,6 +4,7 @@ import (
 	"api/internal/middleware"
 	"api/internal/repo"
 	"api/internal/response"
+	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -66,4 +67,29 @@ func (p *UserHandler) AddRequest(w http.ResponseWriter, r *http.Request) {}
 
 func (p *UserHandler) ConfirmRequest(w http.ResponseWriter, r *http.Request) {}
 
-func (p *UserHandler) FillProfile(w http.ResponseWriter, r *http.Request) {}
+func (p *UserHandler) FillProfile(w http.ResponseWriter, r *http.Request) {
+	var user repo.UsersList
+
+	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+		response.APIRespond(w, http.StatusBadRequest, "failde to decode user", err.Error(), "ERROR")
+		return
+	}
+
+	userID := middleware.GetContext(r.Context())
+
+	p.User.FillProfile(userID, user)
+
+	response.APIRespond(w, http.StatusOK, "profile updated", "id: "+userID.String(), "INFO")
+}
+
+func (p *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetContext(r.Context())
+
+	user, err := p.User.FindUser(userID)
+	if err != nil {
+		response.APIRespond(w, http.StatusNotFound, err.Error(), "", "ERROR")
+		return
+	}
+
+	response.RespondWithJSON(w, http.StatusOK, user)
+}

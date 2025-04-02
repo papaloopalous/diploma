@@ -23,7 +23,7 @@ type UserData struct {
 	requests  [][]uuid.UUID
 }
 
-type usersList struct {
+type UsersList struct {
 	ID        uuid.UUID `json:"id"`
 	Fio       string    `json:"fio"`
 	Age       uint8     `json:"age"`
@@ -33,16 +33,16 @@ type usersList struct {
 }
 
 type UserRepo interface {
-	FindUser(userID uuid.UUID) (fio string, role string, age uint8, specialty string, err error)
-	AddUser(fio string, username string, pass string, role string, age uint8, specialty string) (err error)
+	FindUser(userID uuid.UUID) (user UsersList, err error)
 	CheckPass(username string, pass string) (userID uuid.UUID, role string, err error)
 	CreateAccount(username string, pass string, role string) (userID uuid.UUID, err error)
-	OutAscendingBySpecialty(orderField string, specialty string) (users []usersList)
-	OutDescendingBySpecialty(orderField string, specialty string) (users []usersList)
+	OutAscendingBySpecialty(orderField string, specialty string) (users []UsersList)
+	OutDescendingBySpecialty(orderField string, specialty string) (users []UsersList)
 	HasThatTeacher(studentID uuid.UUID, teacherID uuid.UUID) bool
 	AddRating(userID uuid.UUID, rating uint8)
-	StudentsByTeacher(teacherID uuid.UUID) (users []usersList)
+	StudentsByTeacher(teacherID uuid.UUID) (users []UsersList)
 	EditGrade(studentID uuid.UUID, grade float32)
+	FillProfile(userID uuid.UUID, userData UsersList)
 }
 
 var _ UserRepo = &UserData{}
@@ -59,20 +59,6 @@ func NewUserRepo() *UserData {
 	}
 }
 
-func (p *UserData) AddUser(fio string, username string, pass string, role string, age uint8, specialty string) (err error) {
-	for _, val := range p.username {
-		if val == username {
-			return errors.New(errlist.ErrNameTaken)
-		}
-	}
-
-	p.fio = append(p.fio, fio)
-	p.role = append(p.role, role)
-	p.age = append(p.age, age)
-	p.specialty = append(p.specialty, specialty)
-	return nil
-}
-
 func (p *UserData) CreateAccount(username string, pass string, role string) (userID uuid.UUID, err error) {
 	for _, val := range p.username {
 		if val == username {
@@ -86,6 +72,11 @@ func (p *UserData) CreateAccount(username string, pass string, role string) (use
 	p.role = append(p.role, role)
 	p.pass = append(p.pass, pass)
 	p.id = append(p.id, userID)
+	p.age = append(p.age, 0)
+	p.fio = append(p.fio, "")
+	p.price = append(p.price, 0)
+	p.rating = append(p.rating, 0)
+	p.specialty = append(p.specialty, "")
 
 	return userID, nil
 }
@@ -102,24 +93,28 @@ func (p *UserData) CheckPass(username string, pass string) (userID uuid.UUID, ro
 	return userID, role, errors.New(errlist.ErrInvalidLogin)
 }
 
-func (p *UserData) FindUser(userID uuid.UUID) (fio string, role string, age uint8, specialty string, err error) {
+func (p *UserData) FindUser(userID uuid.UUID) (user UsersList, err error) {
 	for i, val := range p.id {
 		if val == userID {
-			fio = p.fio[i]
-			role = p.role[i]
-			age = p.age[i]
-			specialty = p.specialty[i]
-			return fio, role, age, specialty, nil
+			user = UsersList{
+				ID:        p.id[i],
+				Fio:       p.fio[i],
+				Age:       p.age[i],
+				Specialty: p.specialty[i],
+				Price:     p.price[i],
+				Rating:    p.rating[i],
+			}
+			return user, nil
 		}
 	}
 
-	return fio, role, age, specialty, errors.New(errlist.ErrUserNotFound)
+	return user, errors.New(errlist.ErrUserNotFound)
 }
 
-func (p *UserData) OutAscendingBySpecialty(orderField string, specialty string) (users []usersList) {
+func (p *UserData) OutAscendingBySpecialty(orderField string, specialty string) (users []UsersList) {
 	for i := range p.fio {
 		if (specialty == "" || p.specialty[i] == specialty) && p.role[i] == "teacher" {
-			users = append(users, usersList{
+			users = append(users, UsersList{
 				ID:        p.id[i],
 				Fio:       p.fio[i],
 				Age:       p.age[i],
@@ -145,10 +140,10 @@ func (p *UserData) OutAscendingBySpecialty(orderField string, specialty string) 
 	return users
 }
 
-func (p *UserData) OutDescendingBySpecialty(orderField string, specialty string) (users []usersList) {
+func (p *UserData) OutDescendingBySpecialty(orderField string, specialty string) (users []UsersList) {
 	for i := range p.fio {
 		if (specialty == "" || p.specialty[i] == specialty) && p.role[i] == "teacher" {
-			users = append(users, usersList{
+			users = append(users, UsersList{
 				ID:        p.id[i],
 				Fio:       p.fio[i],
 				Age:       p.age[i],
@@ -196,7 +191,7 @@ func (p *UserData) AddRating(userID uuid.UUID, rating uint8) {
 	}
 }
 
-func (p *UserData) StudentsByTeacher(teacherID uuid.UUID) (users []usersList) {
+func (p *UserData) StudentsByTeacher(teacherID uuid.UUID) (users []UsersList) {
 	var students []uuid.UUID
 
 	for i, val := range p.id {
@@ -209,7 +204,7 @@ func (p *UserData) StudentsByTeacher(teacherID uuid.UUID) (users []usersList) {
 	for _, val := range students {
 		for i, val1 := range p.id {
 			if val1 == val {
-				users = append(users, usersList{
+				users = append(users, UsersList{
 					ID:     p.id[i],
 					Fio:    p.fio[i],
 					Age:    p.age[i],
@@ -250,3 +245,16 @@ func (p *UserData) AddRequest(studentID uuid.UUID, teacherID uuid.UUID) {
 }
 
 //func (p *UserData) Accept()
+
+//func (p *UserData) Deny()
+
+func (p *UserData) FillProfile(userID uuid.UUID, userData UsersList) {
+	for i, val := range p.id {
+		if val == userID {
+			p.age[i] = userData.Age
+			p.fio[i] = userData.Fio
+			p.specialty[i] = userData.Specialty
+			p.price[i] = userData.Price
+		}
+	}
+}

@@ -2,6 +2,7 @@ package router
 
 import (
 	"api/internal/handlers"
+	"api/internal/middleware"
 	"api/internal/repo"
 	"net/http"
 
@@ -30,6 +31,16 @@ func CreateNewRouter() *mux.Router {
 		Tasks: taskRepo,
 	}
 
+	userHandler := &handlers.UserHandler{
+		User: userRepo,
+	}
+
+	middlewareHandler := &middleware.MiddlewareHandler{
+		User:    userRepo,
+		Session: sessionRepo,
+		Token:   tokenRepo,
+	}
+
 	router := mux.NewRouter()
 
 	router.PathPrefix("/assets/").Handler(http.StripPrefix("/assets/", http.FileServer(http.Dir("assets"))))
@@ -41,11 +52,17 @@ func CreateNewRouter() *mux.Router {
 	router.HandleFunc("/api/logout", authHandler.LogOUT).Methods("DELETE")
 
 	router.HandleFunc("/", handlers.OutIndex)
-	router.HandleFunc("/register.html", handlers.OutRegister)        // страница регистрации
-	router.HandleFunc("/login.html", handlers.OutLogin)              // страница входа
-	router.HandleFunc("/fill-profile.html", handlers.OutFillProfile) // страница профиля
-	router.HandleFunc("/main.html", handlers.OutMain)                // главная после входа
+	router.HandleFunc("/register.html", handlers.OutRegister)
+	router.HandleFunc("/login.html", handlers.OutLogin)
+	router.HandleFunc("/fill-profile.html", handlers.OutFillProfile)
+	router.HandleFunc("/main.html", handlers.OutMain)
 	router.HandleFunc("/task.html", handlers.OutTask)
+
+	userRouter := router.NewRoute().Subrouter()
+	userRouter.Use(middlewareHandler.CheckTeacher)
+	userRouter.HandleFunc("/api/fill-profile", userHandler.FillProfile).Methods("POST")
+
+	userRouter.HandleFunc("/api/get-profile", userHandler.GetProfile).Methods("GET")
 
 	//router.HandleFunc("/api/createUser", handlers.CreateUser).Methods("POST")
 

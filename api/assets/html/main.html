@@ -224,33 +224,43 @@
     // Общие: Профиль
     async function loadProfile() {
       try {
-        const res = await fetch('/api/get-profile', {
-          credentials: 'include'
-        });
-        const raw = await res.json();
-        const result = normalizeResponse(raw);
-        if (result.code === 'ERROR') {
-          alert('Ошибка: ' + result.message + ' (код ' + result.statusCode + ')');
+        const res = await fetch('/api/get-profile', { credentials: 'include' });
+        if (!res.ok) {
+          const text = await res.text();
+          alert("Ошибка сервера: " + text);
           return;
         }
-        renderProfile(result.userList || {});
-      } catch (err) {
-        alert('Ошибка сети: ' + err.message);
-      }
-    }
 
-    function renderProfile(user) {
-      const container = document.getElementById('profileInfo');
-      container.innerHTML = '';
-      if (!user.fio) {
-        container.textContent = 'Профиль не заполнен';
-        return;
+        const user = await res.json();
+        console.log("Сервер вернул:", user); // ЛОГ для проверки
+
+        const container = document.getElementById('profileInfo');
+
+        if (!user || typeof user.fio !== 'string' || user.fio.trim() === '') {
+          container.textContent = 'Профиль не заполнен';
+          return;
+        }
+
+        let html = `
+          <p><strong>ФИО:</strong> ${user.fio}</p>
+          <p><strong>Возраст:</strong> ${user.age}</p>
+        `;
+
+        if (user.specialty) {
+          html += `<p><strong>Специализация:</strong> ${user.specialty}</p>`;
+        }
+        if (typeof user.price === 'number') {
+          html += `<p><strong>Цена:</strong> ${user.price}</p>`;
+        }
+        if (typeof user.rating === 'number') {
+          html += `<p><strong>Рейтинг:</strong> ${user.rating}</p>`;
+        }
+
+        container.innerHTML = html;
+
+      } catch (err) {
+        alert("Ошибка загрузки профиля: " + err.message);
       }
-      let info = `ФИО: ${user.fio}, Возраст: ${user.age}`;
-      if (user.specialty) info += `, Специализация: ${user.specialty}`;
-      if (typeof user.price !== 'undefined') info += `, Цена: ${user.price}`;
-      if (typeof user.rating !== 'undefined') info += `, Рейтинг: ${user.rating}`;
-      container.textContent = info;
     }
 
     // Студент -> Все преподаватели

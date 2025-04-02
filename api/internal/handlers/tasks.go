@@ -29,7 +29,7 @@ func (p *TaskHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 
 	studentID := uuid.MustParse(userID)
 
-	_, _, _, _, err := p.User.FindUser(studentID)
+	_, err := p.User.FindUser(studentID)
 	if err != nil {
 		response.APIRespond(w, http.StatusNotFound, errlist.ErrUserNotFound, err.Error(), "ERROR")
 		return
