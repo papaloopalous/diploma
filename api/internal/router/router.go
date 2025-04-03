@@ -64,16 +64,17 @@ func CreateNewRouter() *mux.Router {
 	studentRouter.HandleFunc("/api/get-teachers", userHandler.OutAllTeachers).Methods("GET")
 	studentRouter.HandleFunc("/api/get-my-teachers", userHandler.OutMyTeachers).Methods("GET")
 	studentRouter.HandleFunc("/api/send-request", userHandler.AddRequest).Methods("POST")
+	studentRouter.HandleFunc("/api/get-student-requests", userHandler.OutRequests).Methods("GET")
 
 	//for teachers
 	teacherRouter := router.NewRoute().Subrouter()
 	teacherRouter.Use(middlewareHandler.CheckTeacher)
 	teacherRouter.HandleFunc("/api/get-students", userHandler.OutAllStudents).Methods("GET")
-	teacherRouter.HandleFunc("/api/get-requests", userHandler.OutRequests).Methods("GET")
+	teacherRouter.HandleFunc("/api/get-teacher-requests", userHandler.OutRequests).Methods("GET")
 	teacherRouter.HandleFunc("/api/confirm", userHandler.ConfirmRequest).Methods("POST")
 	teacherRouter.HandleFunc("/api/deny", userHandler.DenyRequest).Methods("POST")
+	teacherRouter.HandleFunc("/upload-task", taskHandler.CreateTask)
 
-	router.HandleFunc("/upload-task", taskHandler.CreateTask)
 	router.HandleFunc("/download-task", taskHandler.DownloadFile)
 
 	//static

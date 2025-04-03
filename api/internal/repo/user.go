@@ -272,6 +272,24 @@ func (p *UserData) Accept(teacherID uuid.UUID, studentID uuid.UUID) {
 			break
 		}
 	}
+
+	for i, val := range p.id {
+		if val == studentID {
+			requests = p.requests[i]
+			index = i
+			break
+		}
+	}
+
+	for i, val := range requests {
+		if val == teacherID {
+			p.teachers[index] = append(p.teachers[index], val)
+			requests = append(requests[:i], requests[i+1:]...)
+			p.requests[index] = requests
+			break
+		}
+	}
+
 }
 
 func (p *UserData) Deny(teacherID uuid.UUID, studentID uuid.UUID) {
@@ -293,27 +311,38 @@ func (p *UserData) Deny(teacherID uuid.UUID, studentID uuid.UUID) {
 			break
 		}
 	}
-}
-
-func (p *UserData) ShowRequests(userID uuid.UUID) (students []UsersList) {
-	var studentsList []uuid.UUID
 
 	for i, val := range p.id {
-		if val == userID {
-			studentsList = p.requests[i]
+		if val == studentID {
+			requests = p.requests[i]
+			index = i
 			break
 		}
 	}
 
-	for i := range studentsList {
-		students = append(students, UsersList{
-			ID:        p.id[i],
-			Fio:       p.fio[i],
-			Age:       p.age[i],
-			Specialty: p.specialty[i],
-			Price:     p.price[i],
-			Rating:    p.rating[i],
-		})
+	for i, val := range requests {
+		if val == teacherID {
+			requests = append(requests[:i], requests[i+1:]...)
+			p.requests[index] = requests
+			break
+		}
+	}
+}
+
+func (p *UserData) ShowRequests(userID uuid.UUID) (students []UsersList) {
+	var requestList []uuid.UUID
+
+	for i, val := range p.id {
+		if val == userID {
+			requestList = p.requests[i]
+			break
+		}
+	}
+
+	for _, val := range requestList {
+		user, _ := p.FindUser(val)
+
+		students = append(students, user)
 	}
 
 	return students

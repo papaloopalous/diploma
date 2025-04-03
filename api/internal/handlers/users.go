@@ -88,7 +88,7 @@ func (p *UserHandler) ConfirmRequest(w http.ResponseWriter, r *http.Request) {
 	studentID := uuid.MustParse(studentIDStr)
 	teacherID := middleware.GetContext(r.Context())
 
-	p.User.Accept(studentID, teacherID)
+	p.User.Accept(teacherID, studentID)
 
 	response.APIRespond(w, http.StatusCreated, "request accepted", "from "+studentID.String()+" to "+teacherID.String(), "INFO")
 }
@@ -103,7 +103,7 @@ func (p *UserHandler) DenyRequest(w http.ResponseWriter, r *http.Request) {
 	studentID := uuid.MustParse(studentIDStr)
 	teacherID := middleware.GetContext(r.Context())
 
-	p.User.Deny(studentID, teacherID)
+	p.User.Deny(teacherID, studentID)
 
 	response.APIRespond(w, http.StatusCreated, "request denied", "from "+studentID.String()+" to "+teacherID.String(), "INFO")
 }
