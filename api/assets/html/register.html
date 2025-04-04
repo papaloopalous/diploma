@@ -25,7 +25,6 @@
   </form>
 
   <script>
-    // Нормализуем ответ сервера
     function normalizeResponse(resp) {
       if (resp.INFO) {
         return {
@@ -48,7 +47,6 @@
       };
     }
 
-    // Кэшируем ключ
     let encryptionKey = null;
 
     async function getEncryptionKey() {
@@ -106,10 +104,8 @@
         const raw = await response.json();
         const result = normalizeResponse(raw);
 
-        console.log('Ответ сервера:', result); // ← для отладки
-
         if (result.code === 'INFO') {
-          window.location.href = 'fill-profile.html';
+          window.location.href = 'fill-profile';
         } else {
           alert('Ошибка: ' + result.message + ' (код ' + result.statusCode + ')');
         }

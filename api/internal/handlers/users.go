@@ -110,6 +110,21 @@ func (p *UserHandler) DenyRequest(w http.ResponseWriter, r *http.Request) {
 	response.APIRespond(w, http.StatusCreated, "request denied", "from "+studentID.String()+" to "+teacherID.String(), "INFO")
 }
 
+func (p *UserHandler) CancelRequest(w http.ResponseWriter, r *http.Request) {
+	teacherIDStr := r.URL.Query().Get("teacherID")
+	if teacherIDStr == "" {
+		response.APIRespond(w, http.StatusBadRequest, "incomplete query", "", "ERROR")
+		return
+	}
+
+	teacherID := uuid.MustParse(teacherIDStr)
+	studentID := middleware.GetContext(r.Context())
+
+	p.User.Deny(teacherID, studentID)
+
+	response.APIRespond(w, http.StatusCreated, "request canceled", "from "+studentID.String()+" to "+teacherID.String(), "INFO")
+}
+
 func (p *UserHandler) OutRequests(w http.ResponseWriter, r *http.Request) {
 	userID := middleware.GetContext(r.Context())
 

@@ -57,7 +57,7 @@ func CreateNewRouter() *mux.Router {
 	userRouter.HandleFunc("/api/fill-profile", userHandler.FillProfile).Methods("POST")
 	userRouter.HandleFunc("/api/get-profile", userHandler.GetProfile).Methods("GET")
 	userRouter.HandleFunc("/api/get-tasks", taskHandler.OutAllTasks).Methods("GET")
-	userRouter.HandleFunc("/download-task", taskHandler.DownloadTask).Methods("GET")
+	userRouter.HandleFunc("/api/download-task", taskHandler.DownloadTask).Methods("GET")
 
 	//for students
 	studentRouter := router.NewRoute().Subrouter()
@@ -66,7 +66,9 @@ func CreateNewRouter() *mux.Router {
 	studentRouter.HandleFunc("/api/get-my-teachers", userHandler.OutMyTeachers).Methods("GET")
 	studentRouter.HandleFunc("/api/send-request", userHandler.AddRequest).Methods("POST")
 	studentRouter.HandleFunc("/api/get-student-requests", userHandler.OutRequests).Methods("GET")
-	studentRouter.HandleFunc("/upload-solution", taskHandler.AddSolution).Methods("POST")
+	studentRouter.HandleFunc("/api/upload-solution", taskHandler.AddSolution).Methods("POST")
+	studentRouter.HandleFunc("/api/add-rating", userHandler.AddRating).Methods("POST")
+	studentRouter.HandleFunc("/api/cancel-request", userHandler.CancelRequest).Methods("POST")
 
 	//for teachers
 	teacherRouter := router.NewRoute().Subrouter()
@@ -75,19 +77,18 @@ func CreateNewRouter() *mux.Router {
 	teacherRouter.HandleFunc("/api/get-teacher-requests", userHandler.OutRequests).Methods("GET")
 	teacherRouter.HandleFunc("/api/confirm", userHandler.ConfirmRequest).Methods("POST")
 	teacherRouter.HandleFunc("/api/deny", userHandler.DenyRequest).Methods("POST")
-	teacherRouter.HandleFunc("/upload-task", taskHandler.CreateTask).Methods("POST")
-	teacherRouter.HandleFunc("/download-solution", taskHandler.DownloadTask).Methods("GET")
-	teacherRouter.HandleFunc("/add-grade", taskHandler.CreateTask).Methods("POST")
+	teacherRouter.HandleFunc("/api/upload-task", taskHandler.CreateTask).Methods("POST")
+	teacherRouter.HandleFunc("/api/download-solution", taskHandler.DownloadTask).Methods("GET")
+	teacherRouter.HandleFunc("/api/add-grade", taskHandler.AddGrade).Methods("POST")
 
 	//static
 	router.HandleFunc("/", handlers.OutIndex)
-	router.HandleFunc("/register.html", handlers.OutRegister)
-	router.HandleFunc("/login.html", handlers.OutLogin)
-	router.HandleFunc("/fill-profile.html", handlers.OutFillProfile)
-	router.HandleFunc("/main.html", handlers.OutMain)
-	router.HandleFunc("/task.html", handlers.OutTask)
-	router.HandleFunc("/chat", handlers.OutChat)
+	router.HandleFunc("/register", handlers.OutRegister)
+	router.HandleFunc("/login", handlers.OutLogin)
+	router.HandleFunc("/fill-profile", handlers.OutFillProfile)
+	router.HandleFunc("/main", handlers.OutMain)
 	router.HandleFunc("/task", handlers.OutTask)
+	router.HandleFunc("/chat", handlers.OutChat)
 
 	return router
 }

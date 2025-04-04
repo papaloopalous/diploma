@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8">
   <title>Вход</title>
-  <!-- Подключаем CryptoJS для AES -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 </head>
 <body>
@@ -93,7 +92,7 @@
         console.log('Login result:', result);
 
         if (result.code === 'INFO') {
-          window.location.href = 'main.html';
+          window.location.href = 'main';
         } else {
           alert('Ошибка: ' + result.message + ' (код ' + result.statusCode + ')');
         }

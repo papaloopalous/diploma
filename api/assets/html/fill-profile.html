@@ -16,7 +16,6 @@
     <label>Возраст:</label><br>
     <input type="number" id="age" min="1" required><br><br>
 
-    <!-- Дополнительные поля для преподавателя -->
     <div id="teacherFields" style="display: none;">
       <label>Цена:</label><br>
       <input type="number" id="price" min="0"><br>
@@ -50,7 +49,6 @@
       };
     }
 
-    // Читаем куку userRole (если HttpOnly=false на сервере)
     function getCookie(name) {
       const matches = document.cookie.match(new RegExp(
         '(?:^|; )' + name.replace(/([\.$?*|{}\(\)\[\]\\\/\+^])/g, '\\$1') + '=([^;]*)'
@@ -97,7 +95,7 @@
         console.log('Fill profile result:', result);
 
         if (result.code === 'INFO') {
-          window.location.href = 'main.html';
+          window.location.href = 'main';
         } else {
           alert('Ошибка: ' + result.message + ' (код ' + result.statusCode + ')');
         }

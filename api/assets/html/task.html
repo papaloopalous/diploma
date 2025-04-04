@@ -10,10 +10,8 @@
 
   <label for="taskName">Task Name:</label><br />
   <input type="text" id="taskName" placeholder="например, Моя работа"><br /><br />
-
   <label for="fileInput">Файл (.docx):</label><br />
   <input type="file" id="fileInput" accept=".docx"><br /><br />
-
   <button onclick="uploadFile()">Загрузить</button>
 
   <script>
@@ -31,18 +29,15 @@
     async function uploadFile() {
       const taskName = document.getElementById("taskName").value.trim();
       const fileInput = document.getElementById("fileInput");
-
       if (!globalStudentID || !taskName || fileInput.files.length === 0) {
         alert("Нет данных о studentID или не заполнено поле задачи / файл");
         return;
       }
-
       const file = fileInput.files[0];
       if (file.size > MAX_FILE_SIZE) {
         alert("Размер файла больше 10 МБ");
         return;
       }
-
       let arrayBuffer;
       try {
         arrayBuffer = await file.arrayBuffer();
@@ -50,7 +45,6 @@
         alert("Ошибка чтения файла: " + err.message);
         return;
       }
-
       const uint8 = new Uint8Array(arrayBuffer);
       let compressed;
       try {
@@ -59,9 +53,8 @@
         alert("Ошибка сжатия файла: " + err.message);
         return;
       }
-
       try {
-        const response = await fetch("/upload-task", {
+        const response = await fetch("/api/upload-task", {
           method: "POST",
           headers: {
             "Content-Type": "application/octet-stream",
@@ -73,6 +66,7 @@
         });
         const text = await response.text();
         alert("Ответ сервера:\n" + text);
+        window.location.href = "/main";
       } catch (err) {
         alert("Ошибка при отправке файла: " + err.message);
       }

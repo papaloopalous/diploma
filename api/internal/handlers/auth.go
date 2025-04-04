@@ -147,7 +147,7 @@ func (p *AuthHandler) LogOUT(w http.ResponseWriter, r *http.Request) {
 
 	userID, err := p.Session.DeleteSession(token.SessionID)
 	if err != nil {
-		response.APIRespond(w, http.StatusInternalServerError, errlist.ErrSesDelete, err.Error(), "ERROR")
+		response.APIRespond(w, http.StatusNotFound, errlist.ErrSesDelete, err.Error(), "ERROR")
 		return
 	}
 
