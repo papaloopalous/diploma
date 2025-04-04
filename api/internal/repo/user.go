@@ -36,8 +36,8 @@ type UserRepo interface {
 	FindUser(userID uuid.UUID) (user UsersList, err error)
 	CheckPass(username string, pass string) (userID uuid.UUID, role string, err error)
 	CreateAccount(username string, pass string, role string) (userID uuid.UUID, err error)
-	OutAscendingBySpecialty(orderField string, specialty string) (users []UsersList)
-	OutDescendingBySpecialty(orderField string, specialty string) (users []UsersList)
+	OutAscendingBySpecialty(orderField string, specialty string, userID uuid.UUID) (users []UsersList)
+	OutDescendingBySpecialty(orderField string, specialty string, userID uuid.UUID) (users []UsersList)
 	HasThatTeacher(studentID uuid.UUID, teacherID uuid.UUID) bool
 	AddRating(userID uuid.UUID, rating uint8)
 	StudentsByTeacher(teacherID uuid.UUID) (users []UsersList)
@@ -119,9 +119,29 @@ func (p *UserData) FindUser(userID uuid.UUID) (user UsersList, err error) {
 	return user, errors.New(errlist.ErrUserNotFound)
 }
 
-func (p *UserData) OutAscendingBySpecialty(orderField string, specialty string) (users []UsersList) {
+func (p *UserData) OutAscendingBySpecialty(orderField string, specialty string, userID uuid.UUID) (users []UsersList) {
+	teachers := make(map[uuid.UUID]struct{})
+	for i, val := range p.id {
+		if val == userID {
+			for _, val := range p.teachers[i] {
+				teachers[val] = struct{}{}
+			}
+		}
+	}
+
+	requests := make(map[uuid.UUID]struct{})
+	for i, val := range p.id {
+		if val == userID {
+			for _, val := range p.requests[i] {
+				requests[val] = struct{}{}
+			}
+		}
+	}
+
 	for i := range p.fio {
-		if (specialty == "" || p.specialty[i] == specialty) && p.role[i] == "teacher" {
+		_, ok1 := teachers[p.id[i]]
+		_, ok2 := requests[p.id[i]]
+		if (specialty == "" || p.specialty[i] == specialty) && p.role[i] == "teacher" && !ok1 && !ok2 {
 			users = append(users, UsersList{
 				ID:        p.id[i],
 				Fio:       p.fio[i],
@@ -148,9 +168,29 @@ func (p *UserData) OutAscendingBySpecialty(orderField string, specialty string) 
 	return users
 }
 
-func (p *UserData) OutDescendingBySpecialty(orderField string, specialty string) (users []UsersList) {
+func (p *UserData) OutDescendingBySpecialty(orderField string, specialty string, userID uuid.UUID) (users []UsersList) {
+	teachers := make(map[uuid.UUID]struct{})
+	for i, val := range p.id {
+		if val == userID {
+			for _, val := range p.teachers[i] {
+				teachers[val] = struct{}{}
+			}
+		}
+	}
+
+	requests := make(map[uuid.UUID]struct{})
+	for i, val := range p.id {
+		if val == userID {
+			for _, val := range p.requests[i] {
+				requests[val] = struct{}{}
+			}
+		}
+	}
+
 	for i := range p.fio {
-		if (specialty == "" || p.specialty[i] == specialty) && p.role[i] == "teacher" {
+		_, ok1 := teachers[p.id[i]]
+		_, ok2 := requests[p.id[i]]
+		if (specialty == "" || p.specialty[i] == specialty) && p.role[i] == "teacher" && !ok1 && !ok2 {
 			users = append(users, UsersList{
 				ID:        p.id[i],
 				Fio:       p.fio[i],

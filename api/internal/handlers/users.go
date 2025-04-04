@@ -20,10 +20,12 @@ func (p *UserHandler) OutAllTeachers(w http.ResponseWriter, r *http.Request) {
 	orderField := r.URL.Query().Get("orderField")
 	specialty := r.URL.Query().Get("specialty")
 
+	userID := middleware.GetContext(r.Context())
+
 	if orderBy == "desc" {
-		response.RespondWithJSON(w, http.StatusOK, p.User.OutDescendingBySpecialty(orderField, specialty))
+		response.RespondWithJSON(w, http.StatusOK, p.User.OutDescendingBySpecialty(orderField, specialty, userID))
 	} else {
-		response.RespondWithJSON(w, http.StatusOK, p.User.OutAscendingBySpecialty(orderField, specialty))
+		response.RespondWithJSON(w, http.StatusOK, p.User.OutAscendingBySpecialty(orderField, specialty, userID))
 	}
 }
 

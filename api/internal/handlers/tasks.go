@@ -42,14 +42,17 @@ func (p *TaskHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	teacherID := middleware.GetContext(r.Context())
-	//teacherID := uuid.MustParse("b65bd4af-797c-4a12-927a-fd807bf95b27")
-	taskID := p.Tasks.CreateTask(teacherID, studentID, taskName)
-	p.Tasks.LinkFile(taskID, fileName, taskData)
+
+	teacher, _ := p.User.FindUser(teacherID)
+	student, _ := p.User.FindUser(studentID)
+
+	taskID := p.Tasks.CreateTask(teacherID, studentID, taskName, teacher.Fio, student.Fio)
+	p.Tasks.LinkFileTask(taskID, fileName, taskData)
 
 	response.APIRespond(w, http.StatusCreated, "task was created", "id: "+taskID.String(), "INFO")
 }
 
-func (p *TaskHandler) DownloadFile(w http.ResponseWriter, r *http.Request) {
+func (p *TaskHandler) DownloadTask(w http.ResponseWriter, r *http.Request) {
 	taskIDStr := r.URL.Query().Get("taskID")
 	if taskIDStr == "" {
 		response.APIRespond(w, http.StatusBadRequest, "incomplete query", "", "ERROR")
@@ -70,12 +73,32 @@ func (p *TaskHandler) DownloadFile(w http.ResponseWriter, r *http.Request) {
 	w.Write(fileData)
 }
 
+func (p *TaskHandler) DownloadSolution(w http.ResponseWriter, r *http.Request) {
+	taskIDStr := r.URL.Query().Get("taskID")
+	if taskIDStr == "" {
+		response.APIRespond(w, http.StatusBadRequest, "incomplete query", "", "ERROR")
+		return
+	}
+
+	taskID := uuid.MustParse(taskIDStr)
+
+	fileName, fileData, _, err := p.Tasks.GetSolution(taskID)
+	if err != nil {
+		response.APIRespond(w, http.StatusNotFound, "file not found", "", "ERROR")
+		return
+	}
+
+	w.Header().Set("Content-Disposition", "attachment; filename=\""+fileName+"\"")
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.WriteHeader(http.StatusOK)
+	w.Write(fileData)
+}
+
 func (p *TaskHandler) AddSolution(w http.ResponseWriter, r *http.Request) {
 	taskIDStr := r.Header.Get("taskID")
-	taskName := r.Header.Get("taskName")
 	fileName := r.Header.Get("fileName")
 
-	if taskIDStr == "" || taskName == "" || fileName == "" {
+	if taskIDStr == "" || fileName == "" {
 		response.APIRespond(w, http.StatusBadRequest, errlist.ErrNoHeaders, "", "ERROR")
 		return
 	}
@@ -88,7 +111,7 @@ func (p *TaskHandler) AddSolution(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	p.Tasks.LinkFile(taskID, fileName, taskData)
+	p.Tasks.LinkFileSolution(taskID, fileName, taskData)
 	p.Tasks.Solve(taskID)
 
 	response.APIRespond(w, http.StatusCreated, "task was updated", "id: "+taskID.String(), "INFO")
@@ -110,7 +133,9 @@ func (p *TaskHandler) AddGrade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	p.Tasks.Grade(taskID, uint8(numGrade))
+	studentID := p.Tasks.Grade(taskID, uint8(numGrade))
+	gradeTotal := p.Tasks.AvgGrade(studentID)
+	p.User.EditGrade(studentID, gradeTotal)
 
 	response.APIRespond(w, http.StatusCreated, "task was updated", "id: "+taskID.String(), "INFO")
 }

@@ -14,20 +14,26 @@ const (
 )
 
 type TaskData struct {
-	id       []uuid.UUID
-	name     []string
-	student  []uuid.UUID
-	teacher  []uuid.UUID
-	fileName []string
-	fileData [][]byte
-	grade    []uint8
-	status   []string
+	id               []uuid.UUID
+	name             []string
+	student          []uuid.UUID
+	studentFIO       []string
+	teacher          []uuid.UUID
+	teacherFIO       []string
+	fileNameTask     []string
+	fileDataTask     [][]byte
+	fileNameSolution []string
+	fileDataSolution [][]byte
+	grade            []uint8
+	status           []string
 }
 
 type TaskRepo interface {
-	CreateTask(teacher uuid.UUID, student uuid.UUID, name string) uuid.UUID
+	CreateTask(teacher uuid.UUID, student uuid.UUID, name string, studentFIO string, teacherFIO string) uuid.UUID
 	GetTask(taskID uuid.UUID) (fileName string, fileData []byte, taskName string, err error)
-	LinkFile(taskID uuid.UUID, fileName string, fileData []byte)
+	GetSolution(taskID uuid.UUID) (fileName string, fileData []byte, taskName string, err error)
+	LinkFileTask(taskID uuid.UUID, fileName string, fileData []byte)
+	LinkFileSolution(taskID uuid.UUID, fileName string, fileData []byte)
 	Grade(taskID uuid.UUID, grade uint8) (studentID uuid.UUID)
 	Solve(taskID uuid.UUID)
 	AvgGrade(studentID uuid.UUID) (grade float32)
@@ -35,10 +41,12 @@ type TaskRepo interface {
 }
 
 type taskList struct {
-	ID     uuid.UUID `json:"taskID"`
-	Name   string    `json:"taskName"`
-	Grade  uint8     `json:"grade,omitempty"`
-	Status string    `json:"status"`
+	ID      uuid.UUID `json:"taskID"`
+	Name    string    `json:"taskName"`
+	Grade   uint8     `json:"grade,omitempty"`
+	Status  string    `json:"status"`
+	Student string    `json:"student"`
+	Teacher string    `json:"teacher"`
 }
 
 var _ TaskRepo = &TaskData{}
@@ -47,16 +55,20 @@ func NewTaskRepo() *TaskData {
 	return &TaskData{}
 }
 
-func (p *TaskData) CreateTask(teacher uuid.UUID, student uuid.UUID, name string) uuid.UUID {
+func (p *TaskData) CreateTask(teacher uuid.UUID, student uuid.UUID, name string, studentFIO string, teacherFIO string) uuid.UUID {
 	id := uuid.New()
 	p.id = append(p.id, id)
 	p.student = append(p.student, student)
 	p.teacher = append(p.teacher, teacher)
 	p.name = append(p.name, name)
 	p.status = append(p.status, statusSent)
-	p.fileData = append(p.fileData, []byte{})
-	p.fileName = append(p.fileName, "")
+	p.fileDataTask = append(p.fileDataTask, []byte{})
+	p.fileNameTask = append(p.fileNameTask, "")
+	p.fileDataSolution = append(p.fileDataSolution, []byte{})
+	p.fileNameSolution = append(p.fileNameSolution, "")
 	p.grade = append(p.grade, 0)
+	p.studentFIO = append(p.studentFIO, studentFIO)
+	p.teacherFIO = append(p.teacherFIO, teacherFIO)
 
 	return id
 }
@@ -64,8 +76,8 @@ func (p *TaskData) CreateTask(teacher uuid.UUID, student uuid.UUID, name string)
 func (p *TaskData) GetTask(taskID uuid.UUID) (fileName string, fileData []byte, taskName string, err error) {
 	for i, val := range p.id {
 		if val == taskID {
-			fileName = p.fileName[i]
-			fileData = p.fileData[i]
+			fileName = p.fileNameTask[i]
+			fileData = p.fileDataTask[i]
 			taskName = p.name[i]
 			return fileName, fileData, taskName, nil
 		}
@@ -74,11 +86,34 @@ func (p *TaskData) GetTask(taskID uuid.UUID) (fileName string, fileData []byte, 
 	return fileName, fileData, taskName, errors.New(errlist.ErrNoTask)
 }
 
-func (p *TaskData) LinkFile(taskID uuid.UUID, fileName string, fileData []byte) {
+func (p *TaskData) GetSolution(taskID uuid.UUID) (fileName string, fileData []byte, taskName string, err error) {
 	for i, val := range p.id {
 		if val == taskID {
-			p.fileData[i] = fileData
-			p.fileName[i] = fileName
+			fileName = p.fileNameSolution[i]
+			fileData = p.fileDataSolution[i]
+			taskName = p.name[i]
+			return fileName, fileData, taskName, nil
+		}
+	}
+
+	return fileName, fileData, taskName, errors.New(errlist.ErrNoTask)
+}
+
+func (p *TaskData) LinkFileTask(taskID uuid.UUID, fileName string, fileData []byte) {
+	for i, val := range p.id {
+		if val == taskID {
+			p.fileDataTask[i] = fileData
+			p.fileNameTask[i] = fileName
+			return
+		}
+	}
+}
+
+func (p *TaskData) LinkFileSolution(taskID uuid.UUID, fileName string, fileData []byte) {
+	for i, val := range p.id {
+		if val == taskID {
+			p.fileDataSolution[i] = fileData
+			p.fileNameSolution[i] = fileName
 			return
 		}
 	}
@@ -127,10 +162,12 @@ func (p *TaskData) AllTasks(userID uuid.UUID) (tasks []taskList) {
 	for i, val := range p.id {
 		if p.student[i] == userID || p.teacher[i] == userID {
 			tasks = append(tasks, taskList{
-				Name:   p.name[i],
-				Status: p.status[i],
-				ID:     val,
-				Grade:  p.grade[i],
+				Name:    p.name[i],
+				Status:  p.status[i],
+				ID:      val,
+				Grade:   p.grade[i],
+				Student: p.studentFIO[i],
+				Teacher: p.teacherFIO[i],
 			})
 		}
 	}
