@@ -1,7 +1,6 @@
 package repo
 
 import (
-	errlist "api/internal/errList"
 	"errors"
 
 	"github.com/google/uuid"
@@ -30,13 +29,13 @@ type TaskData struct {
 
 type TaskRepo interface {
 	CreateTask(teacher uuid.UUID, student uuid.UUID, name string, studentFIO string, teacherFIO string) uuid.UUID
-	GetTask(taskID uuid.UUID) (fileName string, fileData []byte, taskName string, err error)
-	GetSolution(taskID uuid.UUID) (fileName string, fileData []byte, taskName string, err error)
-	LinkFileTask(taskID uuid.UUID, fileName string, fileData []byte)
-	LinkFileSolution(taskID uuid.UUID, fileName string, fileData []byte)
-	Grade(taskID uuid.UUID, grade uint8) (studentID uuid.UUID)
-	Solve(taskID uuid.UUID)
-	AvgGrade(studentID uuid.UUID) (grade float32)
+	GetTask(taskID uuid.UUID) (fileName string, fileData []byte, err error)
+	GetSolution(taskID uuid.UUID) (fileName string, fileData []byte, err error)
+	LinkFileTask(taskID uuid.UUID, fileName string, fileData []byte) error
+	LinkFileSolution(taskID uuid.UUID, fileName string, fileData []byte) error
+	Grade(taskID uuid.UUID, grade uint8) (studentID uuid.UUID, err error)
+	Solve(taskID uuid.UUID) error
+	AvgGrade(studentID uuid.UUID) (grade float32, err error)
 	AllTasks(userID uuid.UUID) (tasks []taskList)
 }
 
@@ -73,89 +72,108 @@ func (p *TaskData) CreateTask(teacher uuid.UUID, student uuid.UUID, name string,
 	return id
 }
 
-func (p *TaskData) GetTask(taskID uuid.UUID) (fileName string, fileData []byte, taskName string, err error) {
+func (p *TaskData) GetTask(taskID uuid.UUID) (fileName string, fileData []byte, err error) {
 	for i, val := range p.id {
 		if val == taskID {
-			fileName = p.fileNameTask[i]
 			fileData = p.fileDataTask[i]
-			taskName = p.name[i]
-			return fileName, fileData, taskName, nil
+			if fileData == nil {
+				return fileName, fileData, errors.New("task is empty")
+			}
+			fileName = p.fileNameTask[i]
+			return fileName, fileData, nil
 		}
 	}
 
-	return fileName, fileData, taskName, errors.New(errlist.ErrNoTask)
+	return fileName, fileData, errors.New("task could not be found")
 }
 
-func (p *TaskData) GetSolution(taskID uuid.UUID) (fileName string, fileData []byte, taskName string, err error) {
+func (p *TaskData) GetSolution(taskID uuid.UUID) (fileName string, fileData []byte, err error) {
 	for i, val := range p.id {
 		if val == taskID {
-			fileName = p.fileNameSolution[i]
 			fileData = p.fileDataSolution[i]
-			taskName = p.name[i]
-			return fileName, fileData, taskName, nil
+			if fileData == nil {
+				return fileName, fileData, errors.New("solution is empty")
+			}
+			fileName = p.fileNameSolution[i]
+			return fileName, fileData, nil
 		}
 	}
 
-	return fileName, fileData, taskName, errors.New(errlist.ErrNoTask)
+	return fileName, fileData, errors.New("task could not be found")
 }
 
-func (p *TaskData) LinkFileTask(taskID uuid.UUID, fileName string, fileData []byte) {
+func (p *TaskData) LinkFileTask(taskID uuid.UUID, fileName string, fileData []byte) error {
 	for i, val := range p.id {
 		if val == taskID {
 			p.fileDataTask[i] = fileData
 			p.fileNameTask[i] = fileName
-			return
+			return nil
 		}
 	}
+
+	return errors.New("task could not be found")
 }
 
-func (p *TaskData) LinkFileSolution(taskID uuid.UUID, fileName string, fileData []byte) {
+func (p *TaskData) LinkFileSolution(taskID uuid.UUID, fileName string, fileData []byte) error {
 	for i, val := range p.id {
 		if val == taskID {
 			p.fileDataSolution[i] = fileData
 			p.fileNameSolution[i] = fileName
-			return
+			return nil
 		}
 	}
+
+	return errors.New("task could not be found")
 }
 
-func (p *TaskData) Grade(taskID uuid.UUID, grade uint8) (studentID uuid.UUID) {
+func (p *TaskData) Grade(taskID uuid.UUID, grade uint8) (studentID uuid.UUID, err error) {
 	for i, val := range p.id {
 		if val == taskID {
 			p.grade[i] = grade
 			p.status[i] = statusGraded
 			studentID = p.student[i]
-			return
+			return studentID, nil
 		}
 	}
 
-	return studentID
+	return studentID, errors.New("task could not be found")
 }
 
-func (p *TaskData) Solve(taskID uuid.UUID) {
+func (p *TaskData) Solve(taskID uuid.UUID) error {
 	for i, val := range p.id {
 		if val == taskID {
 			p.status[i] = statusSolved
-			return
+			return nil
 		}
 	}
+
+	return errors.New("task could not be found")
 }
 
-func (p *TaskData) AvgGrade(studentID uuid.UUID) (grade float32) {
+func (p *TaskData) AvgGrade(studentID uuid.UUID) (grade float32, err error) {
 	var count float32 = 0
 
+	found := false
 	for i, val := range p.student {
-		if val == studentID && p.status[i] == statusGraded {
-			grade += float32(p.grade[i])
-			count++
+		if val == studentID {
+			found = true
+			if p.status[i] == statusGraded {
+				grade += float32(p.grade[i])
+				count++
+				found = true
+			}
 		}
+	}
+
+	if !found {
+		return grade, errors.New("student could not be found")
 	}
 
 	if count != 0 {
-		return grade / count
+		return grade / count, nil
 	}
 
-	return 0
+	return grade, nil
 }
 
 func (p *TaskData) AllTasks(userID uuid.UUID) (tasks []taskList) {

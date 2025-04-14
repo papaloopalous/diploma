@@ -1,7 +1,6 @@
 package repo
 
 import (
-	errlist "api/internal/errList"
 	"errors"
 	"time"
 
@@ -49,7 +48,7 @@ func (p *SessionData) GetSession(sessionID uuid.UUID) (userID uuid.UUID, role st
 	if found && expiresAt.Compare(time.Now()) == 1 {
 		return userID, role, nil
 	} else {
-		return userID, role, errors.New(errlist.ErrNoSession)
+		return userID, role, errors.New("session could not be found")
 	}
 }
 
@@ -82,5 +81,5 @@ func (p *SessionData) DeleteSession(sessionID uuid.UUID) (userID uuid.UUID, err 
 		return userID, nil
 	}
 
-	return userID, errors.New(errlist.ErrSesNotFound)
+	return userID, errors.New("session could not be found")
 }

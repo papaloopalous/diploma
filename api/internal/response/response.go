@@ -2,44 +2,30 @@ package response
 
 import (
 	loggergrpc "api/internal/loggerGRPC"
-	"bytes"
 	"encoding/json"
 	"net/http"
-	"strconv"
 )
 
 type APIResponse struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-	Details string `json:"details,omitempty"`
+	Success bool        `json:"success"`
+	Code    int         `json:"code"`
+	Message string      `json:"message"`
+	Data    interface{} `json:"data,omitempty"`
 }
 
-func APIRespond(w http.ResponseWriter, code int, message string, details string, resType string) {
-	w.WriteHeader(code)
-	Response := APIResponse{
-		Code:    code,
-		Message: message,
-	}
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		resType: Response,
-	})
-
-	loggergrpc.LC.Log("api", resType, message, map[string]string{"code": strconv.Itoa(code), "details": details})
-}
-
-func RespondWithJSON(w http.ResponseWriter, statusCode int, data interface{}) {
+func WriteAPIResponse(w http.ResponseWriter, statusCode int, success bool, message string, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
 
-	// Пробуем закодировать JSON в буфер
-	buf := &bytes.Buffer{}
-	err := json.NewEncoder(buf).Encode(data)
-	if err != nil {
-		// Если ошибка — возвращаем 500 через стандартный http.Error
-		http.Error(w, "Ошибка сериализации JSON: "+err.Error(), http.StatusInternalServerError)
-		return
+	resp := APIResponse{
+		Success: success,
+		Code:    statusCode,
+		Message: message,
+		Data:    data,
 	}
 
-	// Только если всё успешно — пишем статус и данные
-	w.WriteHeader(statusCode)
-	w.Write(buf.Bytes())
+	err := json.NewEncoder(w).Encode(resp)
+	if err != nil {
+		loggergrpc.LC.LogError("api", "failed to write a response", map[string]string{"error: ": err.Error()})
+	}
 }

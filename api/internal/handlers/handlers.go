@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"api/internal/encryption"
+	loggergrpc "api/internal/loggerGRPC"
 	"api/internal/response"
 	"encoding/base64"
 	"html/template"
@@ -11,7 +12,8 @@ import (
 func EncryptionKey(w http.ResponseWriter, r *http.Request) {
 	key, err := encryption.GetEncryptionKey()
 	if err != nil {
-		response.APIRespond(w, http.StatusInternalServerError, err.Error(), "", "ERROR")
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, "encryption error", nil)
+		loggergrpc.LC.LogError("encryption", "failed to get an encryption key", map[string]string{"details": err.Error()})
 		return
 	}
 	w.Write([]byte(base64.StdEncoding.EncodeToString(key)))
@@ -20,7 +22,8 @@ func EncryptionKey(w http.ResponseWriter, r *http.Request) {
 func serveHTML(w http.ResponseWriter, _ *http.Request, filename string) {
 	tmpl, err := template.ParseFiles("assets/html/" + filename)
 	if err != nil {
-		response.APIRespond(w, http.StatusInternalServerError, err.Error(), "", "ERROR")
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, "failed to output the page", nil)
+		loggergrpc.LC.LogError("encryption", "failed to parse the html", map[string]string{"details": err.Error()})
 		return
 	}
 	tmpl.Execute(w, nil)
@@ -51,10 +54,5 @@ func OutTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func OutChat(w http.ResponseWriter, r *http.Request) {
-	tmpl, err := template.ParseFiles("assets/html/chat.html")
-	if err != nil {
-		response.APIRespond(w, http.StatusInternalServerError, err.Error(), "", "ERROR")
-		return
-	}
-	tmpl.Execute(w, nil)
+	serveHTML(w, r, "chat.html")
 }

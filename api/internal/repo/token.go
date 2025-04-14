@@ -1,7 +1,6 @@
 package repo
 
 import (
-	errlist "api/internal/errList"
 	"errors"
 	"time"
 
@@ -53,7 +52,12 @@ func (p *TokenData) GenerateJWT(sessionID uuid.UUID) (string, error) {
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
-	return token.SignedString(p.GetData())
+	res, err := token.SignedString(p.GetData())
+	if err != nil {
+		return res, errors.New("failde to generate the token")
+	}
+
+	return res, nil
 }
 
 func (p *TokenData) ParseJWT(tokenString string) (*MyClaims, error) {
@@ -62,12 +66,12 @@ func (p *TokenData) ParseJWT(tokenString string) (*MyClaims, error) {
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, errors.New("failed to parse the token")
 	}
 
 	if claims, ok := token.Claims.(*MyClaims); ok && token.Valid {
 		return claims, nil
 	}
 
-	return nil, errors.New(errlist.ErrInvalidToken)
+	return nil, errors.New("token is invalid")
 }
