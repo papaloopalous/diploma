@@ -3,106 +3,31 @@
 <head>
   <meta charset="UTF-8">
   <title>Заполнение профиля</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+  <script src="../assets/js/fill-profile.js" defer></script>
 </head>
 <body>
-  <h1>Заполните профиль</h1>
-  <form id="profileForm">
-    <label>Фамилия:</label><br>
-    <input type="text" id="lastName" required><br>
-    <label>Имя:</label><br>
-    <input type="text" id="firstName" required><br>
-    <label>Отчество:</label><br>
-    <input type="text" id="middleName"><br>
-    <label>Возраст:</label><br>
-    <input type="number" id="age" min="1" required><br><br>
-
-    <div id="teacherFields" style="display: none;">
-      <label>Цена:</label><br>
-      <input type="number" id="price" min="0"><br>
-      <label>Специализация:</label><br>
-      <input type="text" id="specialty"><br><br>
-    </div>
-
-    <button type="submit">Сохранить</button>
-  </form>
-
-  <script>
-    function normalizeResponse(resp) {
-      if (resp.INFO) {
-        return {
-          code: 'INFO',
-          statusCode: resp.INFO.code,
-          message: resp.INFO.message
-        };
-      }
-      if (resp.ERROR) {
-        return {
-          code: 'ERROR',
-          statusCode: resp.ERROR.code,
-          message: resp.ERROR.message
-        };
-      }
-      return {
-        code: 'UNKNOWN',
-        statusCode: 0,
-        message: 'Неизвестный формат ответа сервера'
-      };
-    }
-
-    function getCookie(name) {
-      const matches = document.cookie.match(new RegExp(
-        '(?:^|; )' + name.replace(/([\.$?*|{}\(\)\[\]\\\/\+^])/g, '\\$1') + '=([^;]*)'
-      ));
-      return matches ? decodeURIComponent(matches[1]) : undefined;
-    }
-    const role = getCookie('userRole');
-    if (role === 'teacher') {
-      document.getElementById('teacherFields').style.display = 'block';
-    }
-
-    document.getElementById('profileForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const lastName = document.getElementById('lastName').value.trim();
-      const firstName = document.getElementById('firstName').value.trim();
-      const middleName = document.getElementById('middleName').value.trim();
-      const age = document.getElementById('age').value.trim();
-
-      let fio = `${lastName} ${firstName}`;
-      if (middleName) {
-        fio += ` ${middleName}`;
-      }
-
-      const payload = {
-        fio: fio,
-        age: Number(age)
-      };
-
-      if (role === 'teacher') {
-        payload.price = Number(document.getElementById('price').value.trim());
-        payload.specialty = document.getElementById('specialty').value.trim();
-      }
-
-      try {
-        const resp = await fetch('/api/fill-profile', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(payload)
-        });
-        const raw = await resp.json();
-        const result = normalizeResponse(raw);
-
-        console.log('Fill profile result:', result);
-
-        if (result.code === 'INFO') {
-          window.location.href = 'main';
-        } else {
-          alert('Ошибка: ' + result.message + ' (код ' + result.statusCode + ')');
-        }
-      } catch (err) {
-        alert('Ошибка сети: ' + err.message);
-      }
-    });
-  </script>
+  <div class="container">
+    <h1>Заполните профиль</h1>
+    <form id="profileForm">
+      <label>Фамилия:</label>
+      <input type="text" id="lastName" required>
+      <label>Имя:</label>
+      <input type="text" id="firstName" required>
+      <label>Отчество:</label>
+      <input type="text" id="middleName">
+      <label>Возраст:</label>
+      <input type="number" id="age" min="1" required>
+      <div id="teacherFields" style="display:none;">
+        <label>Цена:</label>
+        <input type="number" id="price" min="0">
+        <label>Специализация:</label>
+        <input type="text" id="specialty">
+      </div>
+      <button type="submit">Сохранить</button>
+    </form>
+    <div id="alertError" class="alert alert-error"></div>
+    <div id="alertSuccess" class="alert alert-success"></div>
+  </div>
 </body>
 </html>

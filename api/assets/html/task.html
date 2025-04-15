@@ -3,74 +3,24 @@
 <head>
   <meta charset="UTF-8">
   <title>Загрузка задания</title>
+  <link rel="stylesheet" href="../assets/css/style.css" />
   <script src="https://unpkg.com/fflate@0.7.4/umd/index.js"></script>
 </head>
 <body onload="fillFromQuery()">
-  <h1>Загрузка задания</h1>
+  <div class="container">
+    <h1>Загрузка задания</h1>
 
-  <label for="taskName">Task Name:</label><br />
-  <input type="text" id="taskName" placeholder="например, Моя работа"><br /><br />
-  <label for="fileInput">Файл (.docx):</label><br />
-  <input type="file" id="fileInput" accept=".docx"><br /><br />
-  <button onclick="uploadFile()">Загрузить</button>
+    <label for="taskName">Название задания:</label>
+    <input type="text" id="taskName" placeholder="например, Моя работа" required />
 
-  <script>
-    let globalStudentID = "";
-    const MAX_FILE_SIZE = 10 * 1024 * 1024;
+    <label for="fileInput">Файл (.docx):</label>
+    <input type="file" id="fileInput" accept=".docx" required />
 
-    function fillFromQuery() {
-      const params = new URLSearchParams(window.location.search);
-      const sid = params.get("studentID");
-      if (sid) {
-        globalStudentID = sid.trim();
-      }
-    }
+    <button onclick="uploadFile()">Загрузить</button>
 
-    async function uploadFile() {
-      const taskName = document.getElementById("taskName").value.trim();
-      const fileInput = document.getElementById("fileInput");
-      if (!globalStudentID || !taskName || fileInput.files.length === 0) {
-        alert("Нет данных о studentID или не заполнено поле задачи / файл");
-        return;
-      }
-      const file = fileInput.files[0];
-      if (file.size > MAX_FILE_SIZE) {
-        alert("Размер файла больше 10 МБ");
-        return;
-      }
-      let arrayBuffer;
-      try {
-        arrayBuffer = await file.arrayBuffer();
-      } catch (err) {
-        alert("Ошибка чтения файла: " + err.message);
-        return;
-      }
-      const uint8 = new Uint8Array(arrayBuffer);
-      let compressed;
-      try {
-        compressed = fflate.gzipSync(uint8);
-      } catch (err) {
-        alert("Ошибка сжатия файла: " + err.message);
-        return;
-      }
-      try {
-        const response = await fetch("/api/upload-task", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/octet-stream",
-            "studentID": globalStudentID,
-            "taskName": taskName,
-            "fileName": file.name
-          },
-          body: compressed
-        });
-        const text = await response.text();
-        alert("Ответ сервера:\n" + text);
-        window.location.href = "/main";
-      } catch (err) {
-        alert("Ошибка при отправке файла: " + err.message);
-      }
-    }
-  </script>
+    <div id="statusBox" class="alert" style="display: none;"></div>
+  </div>
+
+  <script src="/assets/js/task.js"></script>
 </body>
 </html>

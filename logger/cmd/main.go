@@ -47,7 +47,9 @@ func (s *LogServer) WriteLog(ctx context.Context, req *logservice.LogRequest) (*
 }
 
 func main() {
-	logger, _ = zap.NewProduction()
+	cfg := zap.NewProductionConfig()
+	cfg.DisableStacktrace = true
+	logger, _ = cfg.Build()
 	defer logger.Sync()
 
 	err := godotenv.Load()

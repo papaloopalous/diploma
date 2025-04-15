@@ -39,7 +39,7 @@ func (p *MiddlewareHandler) CheckSes(w http.ResponseWriter, r *http.Request, nex
 	userID, role, err := p.Session.GetSession(token.SessionID)
 	if err != nil {
 		response.WriteAPIResponse(w, http.StatusUnauthorized, false, messages.ErrNoSession, nil)
-		loggergrpc.LC.LogInfo(messages.ServiceAuth, messages.ErrSessionNotFound, map[string]string{messages.LogSessionID: token.SessionID.String()})
+		loggergrpc.LC.LogError(messages.ServiceAuth, messages.ErrSessionNotFound, map[string]string{messages.LogSessionID: token.SessionID.String()})
 		return
 	}
 

@@ -177,7 +177,11 @@ func (p *UserData) HasThatTeacher(studentID uuid.UUID, teacherID uuid.UUID) bool
 func (p *UserData) AddRating(teacherID uuid.UUID, rating uint8) error {
 	for i, val := range p.id {
 		if val == teacherID {
-			p.rating[i] = (p.rating[i] + float32(rating)) / 2
+			if p.rating[i] == 0 {
+				p.rating[i] = float32(rating)
+			} else {
+				p.rating[i] = (p.rating[i] + float32(rating)) / 2
+			}
 			return nil
 		}
 	}
@@ -416,6 +420,7 @@ func (p *UserData) TeachersByStudent(studentID uuid.UUID) (teachers []UsersList,
 	for i, val := range p.id {
 		if val == studentID {
 			teachersList = p.teachers[i]
+			found = true
 			break
 		}
 	}

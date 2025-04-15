@@ -1,73 +1,181 @@
-body {
-    font-family: Arial, sans-serif;
-    background-color: #f4f4f4;
+* {
+    box-sizing: border-box;
+  }
+  
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', sans-serif;
+    background: #1e1e1e;
+    color: #f0f0f0;
     display: flex;
     justify-content: center;
     align-items: center;
     height: 100vh;
-    margin: 0;
-}
-
-.container {
-    background: white;
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+  }
+  
+  .container {
+    width: 600px;
+    padding: 30px;
+    background: #2b2b2b;
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  }
+  
+  h1 {
     text-align: center;
-    width: 300px;
-}
-
-h2 {
-    margin-bottom: 15px;
-}
-
-.btn-group {
-    display: flex;
-    justify-content: space-between;
+    font-size: 24px;
     margin-bottom: 20px;
-}
-
-button {
-    padding: 10px 20px;
-    border: none;
-    background-color: #007BFF;
-    color: white;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: 0.3s;
-    flex: 1;
-    margin: 5px;
-}
-
-button:hover {
-    background-color: #0056b3;
-}
-
-.form-container {
-    display: none;
-}
-
-.hidden {
-    display: none;
-}
-
-input {
-    width: calc(100% - 20px);
-    padding: 10px;
-    margin: 5px 0;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-}
-
-form button {
+    color: #ffffff;
+  }
+  
+  label {
+    display: block;
+    margin-top: 15px;
+    font-size: 14px;
+    color: #dcdcdc;
+  }
+  
+  input, select {
     width: 100%;
-}
-
-.form-container {
-    display: none; /* По умолчанию скрыто */
-}
-
-.form-container:not(.hidden) {
-    display: block; /* Показываем, если класс hidden удален */
-}
-
+    padding: 10px;
+    margin-top: 5px;
+    font-size: 14px;
+    background: #1a1a1a;
+    border: 1px solid #444;
+    border-radius: 5px;
+    color: #fff;
+    outline: none;
+  }
+  
+  input:focus, select:focus {
+    border-color: #00bfff;
+    box-shadow: 0 0 5px #00bfff55;
+  }
+  
+  button {
+    margin-top: 20px;
+    width: 100%;
+    padding: 10px;
+    font-size: 15px;
+    font-weight: bold;
+    background: linear-gradient(135deg, #007acc, #005a9e);
+    border: none;
+    border-radius: 5px;
+    color: white;
+    cursor: pointer;
+    transition: background 0.3s ease;
+  }
+  
+  button:hover {
+    background: linear-gradient(135deg, #008fff, #0070cc);
+  }
+  
+  .alert {
+    margin-top: 16px;
+    padding: 12px;
+    font-size: 14px;
+    border-radius: 5px;
+    display: none;
+    word-break: break-word;
+  }
+  
+  .alert-error {
+    background: #ff4d4d1a;
+    border: 1px solid #ff4d4d;
+    color: #ff9999;
+  }
+  
+  .alert-success {
+    background: #4dff4d1a;
+    border: 1px solid #4dff4d;
+    color: #99ff99;
+  }
+  
+  nav {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 20px;
+    width: 100%;
+  }
+  
+  nav button {
+    background: linear-gradient(135deg, #007acc, #005a9e);
+    border: none;
+    border-radius: 6px;
+    padding: 10px;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.3s ease;
+  }
+  
+  nav button:hover {
+    background: linear-gradient(135deg, #0094ff, #0070cc);
+  }
+  
+  .section {
+    display: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    margin-top: 20px;
+  }
+  
+  .section.active {
+    display: block;
+    opacity: 1;
+  }
+  
+  hr {
+    border: none;
+    height: 1px;
+    background-color: #444;
+    margin: 20px 0;
+  }
+  
+  label {
+    display: block;
+    margin-top: 15px;
+    font-size: 14px;
+  }
+  
+  select {
+    margin-top: 5px;
+    margin-bottom: 15px;
+    width: 100%;
+    padding: 8px;
+    background-color: #1a1a1a;
+    color: white;
+    border: 1px solid #555;
+    border-radius: 4px;
+  }
+  
+  .menu {
+    display: none;
+    width: 100%;
+  }
+  
+  .menu.active {
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .main-container {
+    width: 70%;
+    max-width: 1200px;
+    background: #2b2b2b;
+    padding: 30px;
+    margin: auto;
+    margin-top: 40px;
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  }
+  
+  .header-bar {
+    display: flex;
+    justify-content: flex-end;
+    margin: 10px 20px 0 0;
+  }
+  
