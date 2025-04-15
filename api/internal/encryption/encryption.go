@@ -1,7 +1,7 @@
 package encryption
 
 import (
-	errlist "api/internal/errList"
+	"api/internal/messages"
 	"crypto/aes"
 	"encoding/base64"
 	"errors"
@@ -21,17 +21,17 @@ func GetEncryptionKey() ([]byte, error) {
 func pkcs7Unpad(data []byte) ([]byte, error) {
 	length := len(data)
 	if length == 0 {
-		return nil, errors.New(errlist.ErrDecrEmpty)
+		return nil, errors.New(messages.ErrDecrEmpty)
 	}
 
 	padding := int(data[length-1])
 	if padding == 0 || padding > aes.BlockSize || padding > length {
-		return nil, errors.New(errlist.ErrDecrPaddingSize)
+		return nil, errors.New(messages.ErrDecrPaddingSize)
 	}
 
 	for i := length - padding; i < length; i++ {
 		if data[i] != byte(padding) {
-			return nil, errors.New(errlist.ErrDecrPaddindByte)
+			return nil, errors.New(messages.ErrDecrPaddindByte)
 		}
 	}
 
@@ -50,7 +50,7 @@ func DecryptData(encryptedData string, key []byte) (string, error) {
 	}
 
 	if len(ciphertext)%block.BlockSize() != 0 {
-		return "", errors.New(errlist.ErrDecrCipher)
+		return "", errors.New(messages.ErrDecrCipher)
 	}
 
 	decrypted := make([]byte, len(ciphertext))

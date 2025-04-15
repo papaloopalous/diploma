@@ -1,6 +1,7 @@
 package repo
 
 import (
+	"api/internal/messages"
 	"errors"
 	"sort"
 
@@ -22,33 +23,6 @@ type UserData struct {
 	requests  [][]uuid.UUID
 }
 
-type UsersList struct {
-	ID        uuid.UUID `json:"id"`
-	Fio       string    `json:"fio"`
-	Age       uint8     `json:"age"`
-	Specialty string    `json:"specialty,omitempty"`
-	Price     int       `json:"price,omitempty"`
-	Rating    float32   `json:"rating"`
-}
-
-type UserRepo interface {
-	FindUser(userID uuid.UUID) (user UsersList, err error)
-	CheckPass(username string, pass string) (userID uuid.UUID, role string, err error)
-	CreateAccount(username string, pass string, role string) (userID uuid.UUID, err error)
-	OutAscendingBySpecialty(orderField string, specialty string, userID uuid.UUID) (users []UsersList)
-	OutDescendingBySpecialty(orderField string, specialty string, userID uuid.UUID) (users []UsersList)
-	HasThatTeacher(studentID uuid.UUID, teacherID uuid.UUID) bool
-	AddRating(userID uuid.UUID, rating uint8) error
-	StudentsByTeacher(teacherID uuid.UUID) (users []UsersList, err error)
-	EditGrade(studentID uuid.UUID, grade float32) error
-	FillProfile(userID uuid.UUID, userData UsersList) error
-	TeachersByStudent(studentID uuid.UUID) (teachers []UsersList, err error)
-	AddRequest(studentID uuid.UUID, teacherID uuid.UUID) error
-	ShowRequests(userID uuid.UUID) (users []UsersList, err error)
-	Accept(teacherID uuid.UUID, studentID uuid.UUID) error
-	Deny(teacherID uuid.UUID, studentID uuid.UUID) error
-}
-
 var _ UserRepo = &UserData{}
 
 func NewUserRepo() *UserData {
@@ -66,7 +40,7 @@ func NewUserRepo() *UserData {
 func (p *UserData) CreateAccount(username string, pass string, role string) (userID uuid.UUID, err error) {
 	for _, val := range p.username {
 		if val == username {
-			return userID, errors.New("username has been taken")
+			return userID, errors.New(messages.ErrNameTaken)
 		}
 	}
 
@@ -97,7 +71,7 @@ func (p *UserData) CheckPass(username string, pass string) (userID uuid.UUID, ro
 		}
 	}
 
-	return userID, role, errors.New("username or password is incorrect")
+	return userID, role, errors.New(messages.ErrCred)
 }
 
 func (p *UserData) FindUser(userID uuid.UUID) (user UsersList, err error) {
@@ -115,7 +89,7 @@ func (p *UserData) FindUser(userID uuid.UUID) (user UsersList, err error) {
 		}
 	}
 
-	return user, errors.New("user could not be found")
+	return user, errors.New(messages.ErrUserNotFound)
 }
 
 func (p *UserData) OutBySpecialty(orderField, specialty string, studentID uuid.UUID, ascending bool) (users []UsersList) {
@@ -135,7 +109,7 @@ func (p *UserData) OutBySpecialty(orderField, specialty string, studentID uuid.U
 	}
 
 	for i := range p.fio {
-		if p.role[i] != "teacher" {
+		if p.role[i] != messages.RoleTeacher {
 			continue
 		}
 		if specialty != "" && p.specialty[i] != specialty {
@@ -208,7 +182,7 @@ func (p *UserData) AddRating(teacherID uuid.UUID, rating uint8) error {
 		}
 	}
 
-	return errors.New("teacher could no be found")
+	return errors.New(messages.ErrTeacherNotFound)
 }
 
 func (p *UserData) StudentsByTeacher(teacherID uuid.UUID) (users []UsersList, err error) {
@@ -224,7 +198,7 @@ func (p *UserData) StudentsByTeacher(teacherID uuid.UUID) (users []UsersList, er
 	}
 
 	if !found {
-		return users, errors.New("teacher could not be found")
+		return users, errors.New(messages.ErrTeacherNotFound)
 	}
 
 	for _, val := range students {
@@ -245,19 +219,19 @@ func (p *UserData) StudentsByTeacher(teacherID uuid.UUID) (users []UsersList, er
 
 func (p *UserData) EditGrade(studentID uuid.UUID, grade float32) error {
 	for i, val := range p.id {
-		if val == studentID && p.role[i] == "student" {
+		if val == studentID && p.role[i] == messages.RoleStudent {
 			p.rating[i] = grade
 			return nil
 		}
 	}
 
-	return errors.New("student could not be found")
+	return errors.New(messages.ErrStudentNotFound)
 }
 
 func (p *UserData) AddRequest(studentID uuid.UUID, teacherID uuid.UUID) error {
 	found := false
 	for i, val := range p.id {
-		if val == teacherID && p.role[i] == "teacher" {
+		if val == teacherID && p.role[i] == messages.RoleTeacher {
 			p.requests[i] = append(p.requests[i], studentID)
 			found = true
 			break
@@ -265,17 +239,17 @@ func (p *UserData) AddRequest(studentID uuid.UUID, teacherID uuid.UUID) error {
 	}
 
 	if !found {
-		return errors.New("teacher could not be found")
+		return errors.New(messages.ErrTeacherNotFound)
 	}
 
 	for i, val := range p.id {
-		if val == studentID && p.role[i] == "student" {
+		if val == studentID && p.role[i] == messages.RoleStudent {
 			p.requests[i] = append(p.requests[i], teacherID)
 			return nil
 		}
 	}
 
-	return errors.New("student could not be found")
+	return errors.New(messages.ErrStudentNotFound)
 }
 
 func (p *UserData) Accept(teacherID uuid.UUID, studentID uuid.UUID) error {
@@ -293,7 +267,7 @@ func (p *UserData) Accept(teacherID uuid.UUID, studentID uuid.UUID) error {
 	}
 
 	if !found {
-		return errors.New("teacher could not be found")
+		return errors.New(messages.ErrTeacherNotFound)
 	}
 
 	found = false
@@ -308,7 +282,7 @@ func (p *UserData) Accept(teacherID uuid.UUID, studentID uuid.UUID) error {
 	}
 
 	if !found {
-		return errors.New("student request could not be found")
+		return errors.New(messages.ErrStudentNotFound)
 	}
 
 	found = false
@@ -322,7 +296,7 @@ func (p *UserData) Accept(teacherID uuid.UUID, studentID uuid.UUID) error {
 	}
 
 	if !found {
-		return errors.New("student could not be found")
+		return errors.New(messages.ErrStudentNotFound)
 	}
 
 	for i, val := range requests {
@@ -334,7 +308,7 @@ func (p *UserData) Accept(teacherID uuid.UUID, studentID uuid.UUID) error {
 		}
 	}
 
-	return errors.New("teacher request could not be found")
+	return errors.New(messages.ErrTeacherReq)
 
 }
 
@@ -353,7 +327,7 @@ func (p *UserData) Deny(teacherID uuid.UUID, studentID uuid.UUID) error {
 	}
 
 	if !found {
-		return errors.New("teacher could not be found")
+		return errors.New(messages.ErrTeacherNotFound)
 	}
 
 	found = false
@@ -367,7 +341,7 @@ func (p *UserData) Deny(teacherID uuid.UUID, studentID uuid.UUID) error {
 	}
 
 	if !found {
-		return errors.New("student request could not be found")
+		return errors.New(messages.ErrStudentNotFound)
 	}
 
 	found = false
@@ -381,7 +355,7 @@ func (p *UserData) Deny(teacherID uuid.UUID, studentID uuid.UUID) error {
 	}
 
 	if !found {
-		return errors.New("student could not be found")
+		return errors.New(messages.ErrStudentNotFound)
 	}
 
 	for i, val := range requests {
@@ -392,7 +366,7 @@ func (p *UserData) Deny(teacherID uuid.UUID, studentID uuid.UUID) error {
 		}
 	}
 
-	return errors.New("teacher request could not be found")
+	return errors.New(messages.ErrTeacherReq)
 
 }
 
@@ -409,7 +383,7 @@ func (p *UserData) ShowRequests(userID uuid.UUID) (users []UsersList, err error)
 	}
 
 	if !found {
-		return users, errors.New("user could not be found")
+		return users, errors.New(messages.ErrUserNotFound)
 	}
 
 	for _, val := range requestList {
@@ -432,7 +406,7 @@ func (p *UserData) FillProfile(userID uuid.UUID, userData UsersList) error {
 		}
 	}
 
-	return errors.New("user could not be found")
+	return errors.New(messages.ErrUserNotFound)
 }
 
 func (p *UserData) TeachersByStudent(studentID uuid.UUID) (teachers []UsersList, err error) {
@@ -447,7 +421,7 @@ func (p *UserData) TeachersByStudent(studentID uuid.UUID) (teachers []UsersList,
 	}
 
 	if !found {
-		return teachers, errors.New("student could not be found")
+		return teachers, errors.New(messages.ErrStudentNotFound)
 	}
 
 	for i := range teachersList {

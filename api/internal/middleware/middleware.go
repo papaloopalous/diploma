@@ -2,6 +2,7 @@ package middleware
 
 import (
 	loggergrpc "api/internal/loggerGRPC"
+	"api/internal/messages"
 	"api/internal/repo"
 	"api/internal/response"
 	"context"
@@ -21,34 +22,34 @@ type contextKey string
 const userKey contextKey = "UserKey"
 
 func (p *MiddlewareHandler) CheckSes(w http.ResponseWriter, r *http.Request, next http.Handler, targetRole string) {
-	cookie, err := r.Cookie("authToken")
+	cookie, err := r.Cookie(messages.CookieAuthToken)
 	if err != nil {
-		response.WriteAPIResponse(w, http.StatusBadRequest, false, "cookie could not be found", nil)
-		loggergrpc.LC.LogInfo("auth", "missing authToken cookie", map[string]string{"details": err.Error()})
+		response.WriteAPIResponse(w, http.StatusBadRequest, false, messages.ErrNoCookie, nil)
+		loggergrpc.LC.LogInfo(messages.ServiceAuth, messages.ErrNoAuthToken, map[string]string{messages.LogDetails: err.Error()})
 		return
 	}
 
 	token, err := p.Token.ParseJWT(cookie.Value)
 	if err != nil {
-		response.WriteAPIResponse(w, http.StatusInternalServerError, false, "invalid token", nil)
-		loggergrpc.LC.LogError("auth", "failed to parse JWT", map[string]string{"details": err.Error()})
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ErrBadToken, nil)
+		loggergrpc.LC.LogError(messages.ServiceAuth, messages.ErrParseToken, map[string]string{messages.LogDetails: err.Error()})
 		return
 	}
 
 	userID, role, err := p.Session.GetSession(token.SessionID)
 	if err != nil {
-		response.WriteAPIResponse(w, http.StatusUnauthorized, false, "session could not be found", nil)
-		loggergrpc.LC.LogInfo("auth", "session not found", map[string]string{"ID": token.SessionID.String()})
+		response.WriteAPIResponse(w, http.StatusUnauthorized, false, messages.ErrNoSession, nil)
+		loggergrpc.LC.LogInfo(messages.ServiceAuth, messages.ErrSessionNotFound, map[string]string{messages.LogSessionID: token.SessionID.String()})
 		return
 	}
 
 	if role != targetRole && targetRole != "any" {
-		response.WriteAPIResponse(w, http.StatusUnauthorized, false, "permission denied", nil)
-		loggergrpc.LC.LogInfo("auth", "permission denied", map[string]string{
-			"ID":   userID.String(),
-			"role": role,
-			"need": targetRole,
-			"path": r.URL.Path,
+		response.WriteAPIResponse(w, http.StatusUnauthorized, false, messages.StatusNoPermission, nil)
+		loggergrpc.LC.LogInfo(messages.ServiceAuth, messages.StatusUserNoPermission, map[string]string{
+			messages.LogUserID:   userID.String(),
+			messages.LogUserRole: role,
+			messages.LogNeedRole: targetRole,
+			messages.LogReqPath:  r.URL.Path,
 		})
 		return
 	}
@@ -58,11 +59,11 @@ func (p *MiddlewareHandler) CheckSes(w http.ResponseWriter, r *http.Request, nex
 }
 
 func (p *MiddlewareHandler) CheckStudent(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { p.CheckSes(w, r, next, "student") })
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { p.CheckSes(w, r, next, messages.RoleStudent) })
 }
 
 func (p *MiddlewareHandler) CheckTeacher(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { p.CheckSes(w, r, next, "teacher") })
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { p.CheckSes(w, r, next, messages.RoleTeacher) })
 }
 
 func (p *MiddlewareHandler) CheckAny(next http.Handler) http.Handler {

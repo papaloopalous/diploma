@@ -3,6 +3,7 @@ package handlers
 import (
 	"api/internal/encryption"
 	loggergrpc "api/internal/loggerGRPC"
+	"api/internal/messages"
 	"api/internal/response"
 	"encoding/base64"
 	"html/template"
@@ -12,8 +13,8 @@ import (
 func EncryptionKey(w http.ResponseWriter, r *http.Request) {
 	key, err := encryption.GetEncryptionKey()
 	if err != nil {
-		response.WriteAPIResponse(w, http.StatusInternalServerError, false, "encryption error", nil)
-		loggergrpc.LC.LogError("encryption", "failed to get an encryption key", map[string]string{"details": err.Error()})
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ErrEncryption, nil)
+		loggergrpc.LC.LogError(messages.ServiceEncryption, messages.ErrKey, map[string]string{messages.LogDetails: err.Error()})
 		return
 	}
 	w.Write([]byte(base64.StdEncoding.EncodeToString(key)))
@@ -22,8 +23,8 @@ func EncryptionKey(w http.ResponseWriter, r *http.Request) {
 func serveHTML(w http.ResponseWriter, _ *http.Request, filename string) {
 	tmpl, err := template.ParseFiles("assets/html/" + filename)
 	if err != nil {
-		response.WriteAPIResponse(w, http.StatusInternalServerError, false, "failed to output the page", nil)
-		loggergrpc.LC.LogError("encryption", "failed to parse the html", map[string]string{"details": err.Error()})
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ErrPageOut, nil)
+		loggergrpc.LC.LogError(messages.ServiceEncryption, messages.ErrHTML, map[string]string{messages.LogDetails: err.Error()})
 		return
 	}
 	tmpl.Execute(w, nil)

@@ -1,6 +1,7 @@
 package repo
 
 import (
+	"api/internal/messages"
 	"errors"
 	"time"
 
@@ -54,7 +55,7 @@ func (p *TokenData) GenerateJWT(sessionID uuid.UUID) (string, error) {
 
 	res, err := token.SignedString(p.GetData())
 	if err != nil {
-		return res, errors.New("failde to generate the token")
+		return res, errors.New(messages.ErrGenToken)
 	}
 
 	return res, nil
@@ -66,12 +67,12 @@ func (p *TokenData) ParseJWT(tokenString string) (*MyClaims, error) {
 	})
 
 	if err != nil {
-		return nil, errors.New("failed to parse the token")
+		return nil, errors.New(messages.ErrParseToken)
 	}
 
 	if claims, ok := token.Claims.(*MyClaims); ok && token.Valid {
 		return claims, nil
 	}
 
-	return nil, errors.New("token is invalid")
+	return nil, errors.New(messages.ErrBadToken)
 }

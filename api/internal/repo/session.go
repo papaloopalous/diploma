@@ -1,6 +1,7 @@
 package repo
 
 import (
+	"api/internal/messages"
 	"errors"
 	"time"
 
@@ -48,7 +49,7 @@ func (p *SessionData) GetSession(sessionID uuid.UUID) (userID uuid.UUID, role st
 	if found && expiresAt.Compare(time.Now()) == 1 {
 		return userID, role, nil
 	} else {
-		return userID, role, errors.New("session could not be found")
+		return userID, role, errors.New(messages.ErrNoSession)
 	}
 }
 
@@ -81,5 +82,5 @@ func (p *SessionData) DeleteSession(sessionID uuid.UUID) (userID uuid.UUID, err 
 		return userID, nil
 	}
 
-	return userID, errors.New("session could not be found")
+	return userID, errors.New(messages.ErrNoSession)
 }

@@ -1,15 +1,10 @@
 package repo
 
 import (
+	"api/internal/messages"
 	"errors"
 
 	"github.com/google/uuid"
-)
-
-const (
-	statusSent   = "sent to student"
-	statusSolved = "ready to grade"
-	statusGraded = "graded"
 )
 
 type TaskData struct {
@@ -25,27 +20,6 @@ type TaskData struct {
 	fileDataSolution [][]byte
 	grade            []uint8
 	status           []string
-}
-
-type TaskRepo interface {
-	CreateTask(teacher uuid.UUID, student uuid.UUID, name string, studentFIO string, teacherFIO string) uuid.UUID
-	GetTask(taskID uuid.UUID) (fileName string, fileData []byte, err error)
-	GetSolution(taskID uuid.UUID) (fileName string, fileData []byte, err error)
-	LinkFileTask(taskID uuid.UUID, fileName string, fileData []byte) error
-	LinkFileSolution(taskID uuid.UUID, fileName string, fileData []byte) error
-	Grade(taskID uuid.UUID, grade uint8) (studentID uuid.UUID, err error)
-	Solve(taskID uuid.UUID) error
-	AvgGrade(studentID uuid.UUID) (grade float32, err error)
-	AllTasks(userID uuid.UUID) (tasks []taskList)
-}
-
-type taskList struct {
-	ID      uuid.UUID `json:"taskID"`
-	Name    string    `json:"taskName"`
-	Grade   uint8     `json:"grade,omitempty"`
-	Status  string    `json:"status"`
-	Student string    `json:"student"`
-	Teacher string    `json:"teacher"`
 }
 
 var _ TaskRepo = &TaskData{}
@@ -77,14 +51,14 @@ func (p *TaskData) GetTask(taskID uuid.UUID) (fileName string, fileData []byte, 
 		if val == taskID {
 			fileData = p.fileDataTask[i]
 			if fileData == nil {
-				return fileName, fileData, errors.New("task is empty")
+				return fileName, fileData, errors.New(messages.ErrTaskEmpty)
 			}
 			fileName = p.fileNameTask[i]
 			return fileName, fileData, nil
 		}
 	}
 
-	return fileName, fileData, errors.New("task could not be found")
+	return fileName, fileData, errors.New(messages.ErrTaskNotFound)
 }
 
 func (p *TaskData) GetSolution(taskID uuid.UUID) (fileName string, fileData []byte, err error) {
@@ -92,14 +66,14 @@ func (p *TaskData) GetSolution(taskID uuid.UUID) (fileName string, fileData []by
 		if val == taskID {
 			fileData = p.fileDataSolution[i]
 			if fileData == nil {
-				return fileName, fileData, errors.New("solution is empty")
+				return fileName, fileData, errors.New(messages.ErrSolutionEmpty)
 			}
 			fileName = p.fileNameSolution[i]
 			return fileName, fileData, nil
 		}
 	}
 
-	return fileName, fileData, errors.New("task could not be found")
+	return fileName, fileData, errors.New(messages.ErrTaskNotFound)
 }
 
 func (p *TaskData) LinkFileTask(taskID uuid.UUID, fileName string, fileData []byte) error {
@@ -111,7 +85,7 @@ func (p *TaskData) LinkFileTask(taskID uuid.UUID, fileName string, fileData []by
 		}
 	}
 
-	return errors.New("task could not be found")
+	return errors.New(messages.ErrTaskNotFound)
 }
 
 func (p *TaskData) LinkFileSolution(taskID uuid.UUID, fileName string, fileData []byte) error {
@@ -123,7 +97,7 @@ func (p *TaskData) LinkFileSolution(taskID uuid.UUID, fileName string, fileData 
 		}
 	}
 
-	return errors.New("task could not be found")
+	return errors.New(messages.ErrTaskNotFound)
 }
 
 func (p *TaskData) Grade(taskID uuid.UUID, grade uint8) (studentID uuid.UUID, err error) {
@@ -136,7 +110,7 @@ func (p *TaskData) Grade(taskID uuid.UUID, grade uint8) (studentID uuid.UUID, er
 		}
 	}
 
-	return studentID, errors.New("task could not be found")
+	return studentID, errors.New(messages.ErrTaskNotFound)
 }
 
 func (p *TaskData) Solve(taskID uuid.UUID) error {
@@ -147,7 +121,7 @@ func (p *TaskData) Solve(taskID uuid.UUID) error {
 		}
 	}
 
-	return errors.New("task could not be found")
+	return errors.New(messages.ErrTaskNotFound)
 }
 
 func (p *TaskData) AvgGrade(studentID uuid.UUID) (grade float32, err error) {
@@ -166,7 +140,7 @@ func (p *TaskData) AvgGrade(studentID uuid.UUID) (grade float32, err error) {
 	}
 
 	if !found {
-		return grade, errors.New("student could not be found")
+		return grade, errors.New(messages.ErrStudentNotFound)
 	}
 
 	if count != 0 {

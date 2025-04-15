@@ -1,9 +1,9 @@
 package main
 
 import (
-	loggergrpc "api/internal/loggerGRPC"
 	"api/internal/router"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 
@@ -13,7 +13,7 @@ import (
 func init() {
 	err := godotenv.Load()
 	if err != nil {
-		loggergrpc.LC.Log("api", "ERROR", ".env was not found", nil)
+		log.Fatal(".env was not found")
 	}
 }
 
