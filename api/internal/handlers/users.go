@@ -49,7 +49,7 @@ func (p *UserHandler) AddRating(w http.ResponseWriter, r *http.Request) {
 
 	studentID := middleware.GetContext(r.Context())
 	if !p.User.HasThatTeacher(studentID, teacherID) {
-		response.WriteAPIResponse(w, http.StatusNotFound, false, messages.ErrNotTheirStudent, nil)
+		response.WriteAPIResponse(w, http.StatusBadRequest, false, messages.ErrNotTheirStudent, nil)
 		return
 	}
 
