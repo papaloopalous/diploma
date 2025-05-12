@@ -15,12 +15,6 @@ type SessionData struct {
 	expiresAt []time.Time
 }
 
-type SessionRepo interface {
-	GetSession(sessionID uuid.UUID) (userID uuid.UUID, role string, err error)
-	SetSession(sessionID uuid.UUID, userID uuid.UUID, role string)
-	DeleteSession(sessionID uuid.UUID) (userID uuid.UUID, err error)
-}
-
 var _ SessionRepo = &SessionData{}
 
 func NewSessionRepo() *SessionData {

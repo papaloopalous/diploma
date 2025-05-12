@@ -1,6 +1,8 @@
 package repo
 
-import "github.com/google/uuid"
+import (
+	"github.com/google/uuid"
+)
 
 //users
 
@@ -58,4 +60,11 @@ type TaskRepo interface {
 	Solve(taskID uuid.UUID) error
 	AvgGrade(studentID uuid.UUID) (grade float32, err error)
 	AllTasks(userID uuid.UUID) (tasks []taskList)
+}
+
+// sessions
+type SessionRepo interface {
+	GetSession(sessionID uuid.UUID) (userID uuid.UUID, role string, err error)
+	SetSession(sessionID uuid.UUID, userID uuid.UUID, role string)
+	DeleteSession(sessionID uuid.UUID) (userID uuid.UUID, err error)
 }

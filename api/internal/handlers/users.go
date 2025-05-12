@@ -25,9 +25,23 @@ func (p *UserHandler) OutAllTeachers(w http.ResponseWriter, r *http.Request) {
 	userID := middleware.GetContext(r.Context())
 
 	if orderBy == "desc" {
-		response.WriteAPIResponse(w, http.StatusOK, true, "", p.User.OutDescendingBySpecialty(orderField, specialty, userID))
+		users, err := p.User.OutDescendingBySpecialty(orderField, specialty, userID)
+		if err != nil {
+			loggergrpc.LC.LogError(messages.ServiceUsers, err.Error(), map[string]string{
+				messages.LogUserID:  userID.String(),
+				messages.LogDetails: err.Error(),
+			})
+		}
+		response.WriteAPIResponse(w, http.StatusOK, true, "", users)
 	} else {
-		response.WriteAPIResponse(w, http.StatusOK, true, "", p.User.OutAscendingBySpecialty(orderField, specialty, userID))
+		users, err := p.User.OutAscendingBySpecialty(orderField, specialty, userID)
+		if err != nil {
+			loggergrpc.LC.LogError(messages.ServiceUsers, err.Error(), map[string]string{
+				messages.LogUserID:  userID.String(),
+				messages.LogDetails: err.Error(),
+			})
+		}
+		response.WriteAPIResponse(w, http.StatusOK, true, "", users)
 	}
 }
 
@@ -48,7 +62,19 @@ func (p *UserHandler) AddRating(w http.ResponseWriter, r *http.Request) {
 	}
 
 	studentID := middleware.GetContext(r.Context())
-	if !p.User.HasThatTeacher(studentID, teacherID) {
+	flag, err := p.User.HasThatTeacher(studentID, teacherID)
+
+	if err != nil {
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, err.Error(), nil)
+		loggergrpc.LC.LogError(messages.ServiceUsers, err.Error(), map[string]string{
+			messages.LogUserID + messages.RoleTeacher: teacherID.String(),
+			messages.LogUserID + messages.RoleStudent: studentID.String(),
+			messages.LogDetails:                       err.Error(),
+		})
+		return
+	}
+
+	if !flag {
 		response.WriteAPIResponse(w, http.StatusBadRequest, false, messages.ErrNotTheirStudent, nil)
 		return
 	}
@@ -60,7 +86,7 @@ func (p *UserHandler) AddRating(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	p.User.AddRating(teacherID, uint8(numRating))
+	p.User.AddRating(teacherID, float32(numRating))
 
 	response.WriteAPIResponse(w, http.StatusOK, true, messages.StatusRated, nil)
 	loggergrpc.LC.LogInfo(messages.ServiceUsers, messages.StatusUserRated, map[string]string{

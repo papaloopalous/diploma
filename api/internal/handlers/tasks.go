@@ -199,7 +199,7 @@ func (p *TaskHandler) AddGrade(w http.ResponseWriter, r *http.Request) {
 
 	err = p.User.EditGrade(studentID, gradeTotal)
 	if err != nil {
-		response.WriteAPIResponse(w, http.StatusInternalServerError, false, err.Error(), nil)
+		response.WriteAPIResponse(w, http.StatusNotFound, false, err.Error(), nil)
 		loggergrpc.LC.LogError(messages.ServiceTasks, err.Error(), map[string]string{
 			messages.LogUserID: studentID.String(), messages.LogDetails: err.Error(),
 		})

@@ -64,7 +64,7 @@ func (r *UserRepoGRPC) FindUser(userID uuid.UUID) (UsersList, error) {
 	ctx := context.Background()
 	resp, err := r.db.GetUserByID(ctx, &userpb.UserIDRequest{Id: userID.String()})
 	if err != nil {
-		return UsersList{}, errors.New(messages.ErrUserNotFound)
+		return UsersList{}, err
 	}
 	return UsersList{
 		ID:        uuid.MustParse(resp.Id),
@@ -153,7 +153,15 @@ func (r *UserRepoGRPC) ShowRequests(userID uuid.UUID) ([]UsersList, error) {
 
 func (r *UserRepoGRPC) AddRating(userID uuid.UUID, newRating float32) error {
 	ctx := context.Background()
-	_, err := r.db.UpdateRating(ctx, &userpb.UpdateRatingRequest{
+
+	resp, err := r.db.GetRating(ctx, &userpb.UserIDRequest{Id: userID.String()})
+	if err != nil {
+		return err
+	}
+
+	newRating = (resp.Rating + newRating) / 2
+
+	_, err = r.db.UpdateRating(ctx, &userpb.UpdateRatingRequest{
 		Id:        userID.String(),
 		NewRating: newRating,
 	})
@@ -236,6 +244,7 @@ func (r *UserRepoGRPC) outBySpecialty(orderField, specialty string, studentID uu
 		Specialty: specialty,
 		Exclude:   exclude,
 	})
+
 	if err != nil {
 		return nil, err
 	}

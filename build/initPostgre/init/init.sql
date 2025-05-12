@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
     age SMALLINT,
     specialty TEXT,
     price INTEGER,
-    rating REAL,
+    rating REAL DEFAULT 0,
     teachers UUID[],
     students UUID[],
     requests UUID[]
