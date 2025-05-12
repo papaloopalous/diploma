@@ -2,167 +2,151 @@ package repo
 
 import (
 	"api/internal/messages"
+	"api/internal/proto/taskpb"
+	"context"
 	"errors"
+	"log"
 
 	"github.com/google/uuid"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
-type TaskData struct {
-	id               []uuid.UUID
-	name             []string
-	student          []uuid.UUID
-	studentFIO       []string
-	teacher          []uuid.UUID
-	teacherFIO       []string
-	fileNameTask     []string
-	fileDataTask     [][]byte
-	fileNameSolution []string
-	fileDataSolution [][]byte
-	grade            []uint8
-	status           []string
+type TaskRepoGRPC struct {
+	db taskpb.TaskServiceClient
 }
 
-var _ TaskRepo = &TaskData{}
-
-func NewTaskRepo() *TaskData {
-	return &TaskData{}
+func NewTaskRepo(grpcAddr string) *TaskRepoGRPC {
+	conn, err := grpc.NewClient(grpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("failed to connect to gRPC user service at %s: %v", grpcAddr, err)
+	}
+	client := taskpb.NewTaskServiceClient(conn)
+	return &TaskRepoGRPC{db: client}
 }
 
-func (p *TaskData) CreateTask(teacher uuid.UUID, student uuid.UUID, name string, studentFIO string, teacherFIO string) uuid.UUID {
-	id := uuid.New()
-	p.id = append(p.id, id)
-	p.student = append(p.student, student)
-	p.teacher = append(p.teacher, teacher)
-	p.name = append(p.name, name)
-	p.status = append(p.status, statusSent)
-	p.fileDataTask = append(p.fileDataTask, []byte{})
-	p.fileNameTask = append(p.fileNameTask, "")
-	p.fileDataSolution = append(p.fileDataSolution, []byte{})
-	p.fileNameSolution = append(p.fileNameSolution, "")
-	p.grade = append(p.grade, 0)
-	p.studentFIO = append(p.studentFIO, studentFIO)
-	p.teacherFIO = append(p.teacherFIO, teacherFIO)
-
-	return id
+func (r *TaskRepoGRPC) CreateTask(teacher uuid.UUID, student uuid.UUID, name string, studentFIO string, teacherFIO string) (uuid.UUID, error) {
+	ctx := context.Background()
+	resp, err := r.db.CreateTask(ctx, &taskpb.CreateTaskRequest{
+		TeacherId:  teacher.String(),
+		StudentId:  student.String(),
+		Name:       name,
+		StudentFio: studentFIO,
+		TeacherFio: teacherFIO,
+	})
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return uuid.MustParse(resp.Id), err
 }
 
-func (p *TaskData) GetTask(taskID uuid.UUID) (fileName string, fileData []byte, err error) {
-	for i, val := range p.id {
-		if val == taskID {
-			fileData = p.fileDataTask[i]
-			if fileData == nil {
-				return fileName, fileData, errors.New(messages.ErrTaskEmpty)
-			}
-			fileName = p.fileNameTask[i]
-			return fileName, fileData, nil
-		}
+func (r *TaskRepoGRPC) GetTask(taskID uuid.UUID) (fileName string, fileData []byte, err error) {
+	ctx := context.Background()
+	resp, err := r.db.GetTask(ctx, &taskpb.TaskIDRequest{
+		Id: taskID.String(),
+	})
+	if err != nil {
+		return "", nil, errors.New(messages.ErrTaskNotFound)
 	}
-
-	return fileName, fileData, errors.New(messages.ErrTaskNotFound)
+	if len(resp.FileData) == 0 {
+		return "", nil, errors.New(messages.ErrTaskEmpty)
+	}
+	return resp.FileName, resp.FileData, nil
 }
 
-func (p *TaskData) GetSolution(taskID uuid.UUID) (fileName string, fileData []byte, err error) {
-	for i, val := range p.id {
-		if val == taskID {
-			fileData = p.fileDataSolution[i]
-			if fileData == nil {
-				return fileName, fileData, errors.New(messages.ErrSolutionEmpty)
-			}
-			fileName = p.fileNameSolution[i]
-			return fileName, fileData, nil
-		}
+func (r *TaskRepoGRPC) GetSolution(taskID uuid.UUID) (fileName string, fileData []byte, err error) {
+	ctx := context.Background()
+	resp, err := r.db.GetSolution(ctx, &taskpb.TaskIDRequest{
+		Id: taskID.String(),
+	})
+	if err != nil {
+		return "", nil, errors.New(messages.ErrTaskNotFound)
 	}
-
-	return fileName, fileData, errors.New(messages.ErrTaskNotFound)
+	if len(resp.FileData) == 0 {
+		return "", nil, errors.New(messages.ErrSolutionEmpty)
+	}
+	return resp.FileName, resp.FileData, nil
 }
 
-func (p *TaskData) LinkFileTask(taskID uuid.UUID, fileName string, fileData []byte) error {
-	for i, val := range p.id {
-		if val == taskID {
-			p.fileDataTask[i] = fileData
-			p.fileNameTask[i] = fileName
-			return nil
-		}
+func (r *TaskRepoGRPC) LinkFileTask(taskID uuid.UUID, fileName string, fileData []byte) error {
+	ctx := context.Background()
+	_, err := r.db.LinkFileTask(ctx, &taskpb.LinkFileRequest{
+		TaskId:   taskID.String(),
+		FileName: fileName,
+		FileData: fileData,
+	})
+	if err != nil {
+		return errors.New(messages.ErrTaskNotFound)
 	}
-
-	return errors.New(messages.ErrTaskNotFound)
+	return nil
 }
 
-func (p *TaskData) LinkFileSolution(taskID uuid.UUID, fileName string, fileData []byte) error {
-	for i, val := range p.id {
-		if val == taskID {
-			p.fileDataSolution[i] = fileData
-			p.fileNameSolution[i] = fileName
-			return nil
-		}
+func (r *TaskRepoGRPC) LinkFileSolution(taskID uuid.UUID, fileName string, fileData []byte) error {
+	ctx := context.Background()
+	_, err := r.db.LinkFileSolution(ctx, &taskpb.LinkFileRequest{
+		TaskId:   taskID.String(),
+		FileName: fileName,
+		FileData: fileData,
+	})
+	if err != nil {
+		return errors.New(messages.ErrTaskNotFound)
 	}
-
-	return errors.New(messages.ErrTaskNotFound)
+	return nil
 }
 
-func (p *TaskData) Grade(taskID uuid.UUID, grade uint8) (studentID uuid.UUID, err error) {
-	for i, val := range p.id {
-		if val == taskID {
-			p.grade[i] = grade
-			p.status[i] = statusGraded
-			studentID = p.student[i]
-			return studentID, nil
-		}
+func (r *TaskRepoGRPC) Grade(taskID uuid.UUID, grade uint8) (studentID uuid.UUID, err error) {
+	ctx := context.Background()
+	resp, err := r.db.Grade(ctx, &taskpb.GradeRequest{
+		TaskId: taskID.String(),
+		Grade:  uint32(grade),
+	})
+	if err != nil {
+		return uuid.Nil, errors.New(messages.ErrTaskNotFound)
 	}
-
-	return studentID, errors.New(messages.ErrTaskNotFound)
+	return uuid.MustParse(resp.StudentId), nil
 }
 
-func (p *TaskData) Solve(taskID uuid.UUID) error {
-	for i, val := range p.id {
-		if val == taskID {
-			p.status[i] = statusSolved
-			return nil
-		}
+func (r *TaskRepoGRPC) Solve(taskID uuid.UUID) error {
+	ctx := context.Background()
+	_, err := r.db.Solve(ctx, &taskpb.TaskIDRequest{
+		Id: taskID.String(),
+	})
+	if err != nil {
+		return errors.New(messages.ErrTaskNotFound)
 	}
-
-	return errors.New(messages.ErrTaskNotFound)
+	return nil
 }
 
-func (p *TaskData) AvgGrade(studentID uuid.UUID) (grade float32, err error) {
-	var count float32 = 0
-
-	found := false
-	for i, val := range p.student {
-		if val == studentID {
-			found = true
-			if p.status[i] == statusGraded {
-				grade += float32(p.grade[i])
-				count++
-				found = true
-			}
-		}
+func (r *TaskRepoGRPC) AvgGrade(studentID uuid.UUID) (grade float32, err error) {
+	ctx := context.Background()
+	resp, err := r.db.AvgGrade(ctx, &taskpb.StudentIDRequest{
+		StudentId: studentID.String(),
+	})
+	if err != nil {
+		return 0, errors.New(messages.ErrStudentNotFound)
 	}
-
-	if !found {
-		return grade, errors.New(messages.ErrStudentNotFound)
-	}
-
-	if count != 0 {
-		return grade / count, nil
-	}
-
-	return grade, nil
+	return resp.Grade, nil
 }
 
-func (p *TaskData) AllTasks(userID uuid.UUID) (tasks []taskList) {
-	for i, val := range p.id {
-		if p.student[i] == userID || p.teacher[i] == userID {
-			tasks = append(tasks, taskList{
-				Name:    p.name[i],
-				Status:  p.status[i],
-				ID:      val,
-				Grade:   p.grade[i],
-				Student: p.studentFIO[i],
-				Teacher: p.teacherFIO[i],
-			})
-		}
+func (r *TaskRepoGRPC) AllTasks(userID uuid.UUID) []taskList {
+	ctx := context.Background()
+	resp, err := r.db.AllTasks(ctx, &taskpb.UserIDRequest{
+		UserId: userID.String(),
+	})
+	if err != nil {
+		return nil
 	}
 
+	tasks := make([]taskList, 0, len(resp.Tasks))
+	for _, t := range resp.Tasks {
+		tasks = append(tasks, taskList{
+			Name:    t.Name,
+			Status:  t.Status,
+			ID:      uuid.MustParse(t.Id),
+			Grade:   uint8(t.Grade),
+			Student: t.Student,
+			Teacher: t.Teacher,
+		})
+	}
 	return tasks
 }

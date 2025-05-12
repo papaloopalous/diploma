@@ -61,7 +61,16 @@ func (p *TaskHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	taskID := p.Tasks.CreateTask(teacherID, studentID, taskName, teacher.Fio, student.Fio)
+	taskID, err := p.Tasks.CreateTask(teacherID, studentID, taskName, teacher.Fio, student.Fio)
+	if err != nil {
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, err.Error(), nil)
+		loggergrpc.LC.LogError(messages.ServiceTasks, err.Error(), map[string]string{
+			messages.LogUserID:  teacherID.String(),
+			messages.LogDetails: err.Error(),
+		})
+		return
+	}
+
 	p.Tasks.LinkFileTask(taskID, fileName, taskData)
 
 	response.WriteAPIResponse(w, http.StatusCreated, true, messages.StatusTaskCreated, "id: "+taskID.String())

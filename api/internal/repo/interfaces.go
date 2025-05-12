@@ -44,14 +44,8 @@ type taskList struct {
 	Teacher string    `json:"teacher"`
 }
 
-const (
-	statusSent   = "sent to student"
-	statusSolved = "ready to grade"
-	statusGraded = "graded"
-)
-
 type TaskRepo interface {
-	CreateTask(teacher uuid.UUID, student uuid.UUID, name string, studentFIO string, teacherFIO string) uuid.UUID
+	CreateTask(teacher uuid.UUID, student uuid.UUID, name string, studentFIO string, teacherFIO string) (uuid.UUID, error)
 	GetTask(taskID uuid.UUID) (fileName string, fileData []byte, err error)
 	GetSolution(taskID uuid.UUID) (fileName string, fileData []byte, err error)
 	LinkFileTask(taskID uuid.UUID, fileName string, fileData []byte) error

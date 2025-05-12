@@ -1,0 +1,80 @@
+syntax = "proto3";
+
+package taskpb;
+
+option go_package = "/taskpb";
+
+service TaskService {
+  rpc CreateTask(CreateTaskRequest) returns (TaskIDResponse);
+  rpc GetTask(TaskIDRequest) returns (FileResponse);
+  rpc GetSolution(TaskIDRequest) returns (FileResponse);
+  rpc LinkFileTask(LinkFileRequest) returns (Empty);
+  rpc LinkFileSolution(LinkFileRequest) returns (Empty);
+  rpc Grade(GradeRequest) returns (StudentIDResponse);
+  rpc Solve(TaskIDRequest) returns (Empty);
+  rpc AvgGrade(StudentIDRequest) returns (GradeResponse);
+  rpc AllTasks(UserIDRequest) returns (TaskListResponse);
+}
+
+message Empty {}
+
+message CreateTaskRequest {
+  string teacher_id = 1;
+  string student_id = 2;
+  string name = 3;
+  string student_fio = 4;
+  string teacher_fio = 5;
+}
+
+message TaskIDResponse {
+  string id = 1;
+}
+
+message TaskIDRequest {
+  string id = 1;
+}
+
+message FileResponse {
+  string file_name = 1;
+  bytes file_data = 2;
+}
+
+message LinkFileRequest {
+  string task_id = 1;
+  string file_name = 2;
+  bytes file_data = 3;
+}
+
+message GradeRequest {
+  string task_id = 1;
+  uint32 grade = 2;
+}
+
+message StudentIDResponse {
+  string student_id = 1;
+}
+
+message StudentIDRequest {
+  string student_id = 1;
+}
+
+message GradeResponse {
+  float grade = 1;
+}
+
+message UserIDRequest {
+  string user_id = 1;
+}
+
+message TaskInfo {
+  string id = 1;
+  string name = 2;
+  string status = 3;
+  uint32 grade = 4;
+  string student = 5;
+  string teacher = 6;
+}
+
+message TaskListResponse {
+  repeated TaskInfo tasks = 1;
+}

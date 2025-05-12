@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"postgre_api/taskpb"
 	"postgre_api/userpb"
 
 	"github.com/google/uuid"
@@ -16,6 +17,7 @@ import (
 
 type server struct {
 	userpb.UnimplementedUserServiceServer
+	taskpb.UnimplementedTaskServiceServer
 	db *pgx.Conn
 }
 
@@ -234,7 +236,7 @@ func (s *server) GetAvailableTeachers(ctx context.Context, req *userpb.Available
 	rows, err := s.db.Query(ctx, `
         SELECT id, fio, age, specialty, price, rating
         FROM users 
-        WHERE role = 'teacher' AND ($1 = '' OR specialty = $1) AND id != ANY($2)
+        WHERE role = 'teacher' AND ($1 = '' OR specialty = $1) AND id != ALL($2)
     `, req.Specialty, req.Exclude)
 	if err != nil {
 		return nil, err
@@ -367,6 +369,150 @@ func (s *server) GetUsersByIDs(ctx context.Context, req *userpb.UUIDListRequest)
 	return &userpb.UsersListResponse{Users: users}, nil
 }
 
+func (s *server) CreateTask(ctx context.Context, req *taskpb.CreateTaskRequest) (*taskpb.TaskIDResponse, error) {
+	taskID := uuid.New()
+
+	_, err := s.db.Exec(ctx, `
+        INSERT INTO tasks (id, teacher_id, student_id, name, student_fio, teacher_fio, status) 
+        VALUES ($1, $2, $3, $4, $5, $6, 'sent to student')
+    `, taskID, req.TeacherId, req.StudentId, req.Name, req.StudentFio, req.TeacherFio)
+	if err != nil {
+		return nil, err
+	}
+
+	return &taskpb.TaskIDResponse{Id: taskID.String()}, nil
+}
+
+func (s *server) GetTask(ctx context.Context, req *taskpb.TaskIDRequest) (*taskpb.FileResponse, error) {
+	var fileName string
+	var fileData []byte
+
+	err := s.db.QueryRow(ctx, `
+        SELECT file_name_task, file_data_task 
+        FROM tasks 
+        WHERE id = $1
+    `, req.Id).Scan(&fileName, &fileData)
+	if err != nil {
+		return nil, err
+	}
+
+	return &taskpb.FileResponse{
+		FileName: fileName,
+		FileData: fileData,
+	}, nil
+}
+
+func (s *server) GetSolution(ctx context.Context, req *taskpb.TaskIDRequest) (*taskpb.FileResponse, error) {
+	var fileName string
+	var fileData []byte
+
+	err := s.db.QueryRow(ctx, `
+        SELECT file_name_solution, file_data_solution 
+        FROM tasks 
+        WHERE id = $1
+    `, req.Id).Scan(&fileName, &fileData)
+	if err != nil {
+		return nil, err
+	}
+
+	return &taskpb.FileResponse{
+		FileName: fileName,
+		FileData: fileData,
+	}, nil
+}
+
+func (s *server) LinkFileTask(ctx context.Context, req *taskpb.LinkFileRequest) (*taskpb.Empty, error) {
+	_, err := s.db.Exec(ctx, `
+        UPDATE tasks 
+        SET file_name_task = $1, file_data_task = $2 
+        WHERE id = $3
+    `, req.FileName, req.FileData, req.TaskId)
+	if err != nil {
+		return nil, err
+	}
+
+	return &taskpb.Empty{}, nil
+}
+
+func (s *server) LinkFileSolution(ctx context.Context, req *taskpb.LinkFileRequest) (*taskpb.Empty, error) {
+	_, err := s.db.Exec(ctx, `
+        UPDATE tasks 
+        SET file_name_solution = $1, file_data_solution = $2 
+        WHERE id = $3
+    `, req.FileName, req.FileData, req.TaskId)
+	if err != nil {
+		return nil, err
+	}
+
+	return &taskpb.Empty{}, nil
+}
+
+func (s *server) Grade(ctx context.Context, req *taskpb.GradeRequest) (*taskpb.StudentIDResponse, error) {
+	var studentID string
+	err := s.db.QueryRow(ctx, `
+        UPDATE tasks 
+        SET grade = $1, status = 'graded' 
+        WHERE id = $2 
+        RETURNING student_id
+    `, req.Grade, req.TaskId).Scan(&studentID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &taskpb.StudentIDResponse{StudentId: studentID}, nil
+}
+
+func (s *server) Solve(ctx context.Context, req *taskpb.TaskIDRequest) (*taskpb.Empty, error) {
+	_, err := s.db.Exec(ctx, `
+        UPDATE tasks 
+        SET status = 'ready to grade' 
+        WHERE id = $1
+    `, req.Id)
+	if err != nil {
+		return nil, err
+	}
+
+	return &taskpb.Empty{}, nil
+}
+
+func (s *server) AvgGrade(ctx context.Context, req *taskpb.StudentIDRequest) (*taskpb.GradeResponse, error) {
+	var avgGrade float32
+	err := s.db.QueryRow(ctx, `
+        SELECT COALESCE(AVG(grade::float), 0) 
+        FROM tasks 
+        WHERE student_id = $1 AND status = 'graded'
+    `, req.StudentId).Scan(&avgGrade)
+	if err != nil {
+		return nil, err
+	}
+
+	return &taskpb.GradeResponse{Grade: avgGrade}, nil
+}
+
+func (s *server) AllTasks(ctx context.Context, req *taskpb.UserIDRequest) (*taskpb.TaskListResponse, error) {
+	rows, err := s.db.Query(ctx, `
+        SELECT id, name, status, COALESCE(grade, 0), student_fio, teacher_fio 
+        FROM tasks 
+        WHERE student_id = $1 OR teacher_id = $1
+    `, req.UserId)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tasks []*taskpb.TaskInfo
+	for rows.Next() {
+		task := &taskpb.TaskInfo{}
+		err := rows.Scan(&task.Id, &task.Name, &task.Status, &task.Grade, &task.Teacher, &task.Student)
+		if err != nil {
+			return nil, err
+		}
+		tasks = append(tasks, task)
+	}
+
+	return &taskpb.TaskListResponse{Tasks: tasks}, nil
+}
+
 func main() {
 	ctx := context.Background()
 
@@ -378,6 +524,7 @@ func main() {
 
 	grpcServer := grpc.NewServer()
 	userpb.RegisterUserServiceServer(grpcServer, &server{db: conn})
+	taskpb.RegisterTaskServiceServer(grpcServer, &server{db: conn})
 
 	reflection.Register(grpcServer)
 

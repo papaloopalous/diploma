@@ -18,7 +18,7 @@ func init() {
 func CreateNewRouter() *mux.Router {
 	userRepo := repo.NewUserRepo("localhost:50052")
 	sessionRepo := repo.NewSessionRepo()
-	taskRepo := repo.NewTaskRepo()
+	taskRepo := repo.NewTaskRepo("localhost:50052")
 
 	authHandler := &handlers.AuthHandler{
 		User:    userRepo,
