@@ -18,6 +18,8 @@ const (
 	ErrBadGrade        = "invalid grade"
 	ErrNotTheirStudent = "you are not their student"
 	ErrBadRating       = "invalid rating"
+	ErrWriteKey        = "failed to write the encryption key"
+	ErrWriteFile       = "failed to write the file"
 )
 
 // logger errors

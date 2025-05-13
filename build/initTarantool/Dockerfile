@@ -1,18 +1,37 @@
-# Используем Ubuntu, чтобы установить tarantool + tarantool-dev
-FROM ubuntu:latest
+FROM tarantool/tarantool:2.10.4
 
-RUN apt-get update && apt-get install -y \
+USER root
+
+# Install dependencies using Alpine package manager
+RUN apk add --no-cache \
+    build-base \
+    cmake \
+    git \
     curl \
-    tarantool \
-    tarantool-dev \
-    lua5.1 \
-    lua5.1-dev \
-    luarocks \
- && rm -rf /var/lib/apt/lists/*
+    unzip
 
-# Установка vshard через tarantoolctl
-RUN tarantoolctl rocks install vshard
+# Install vshard directly from GitHub with timeout and retry
+RUN timeout 60 tarantoolctl rocks install https://raw.githubusercontent.com/tarantool/vshard/master/vshard-scm-1.rockspec || \
+    timeout 60 tarantoolctl rocks install https://raw.githubusercontent.com/tarantool/vshard/1.7.0/vshard-1.7.0-1.rockspec
+
+# Create necessary directories and set permissions
+RUN mkdir -p /var/lib/tarantool && \
+    chown -R tarantool:tarantool /var/lib/tarantool && \
+    mkdir -p /opt/tarantool && \
+    chown -R tarantool:tarantool /opt/tarantool
+
+# Switch back to tarantool user
+USER tarantool
+
+# Copy configuration files
+COPY --chown=tarantool:tarantool *.lua /opt/tarantool/
 
 WORKDIR /opt/tarantool
 
-CMD ["tarantool"]
+# Set Tarantool options
+ENV TARANTOOL_WORKDIR=/opt/tarantool \
+    TARANTOOL_TIMEOUT=10 \
+    TARANTOOL_INSTANCE_NAME=default
+
+# Initialize and start
+CMD ["tarantool", "/opt/tarantool/router.lua"]

@@ -71,7 +71,15 @@ func (p *TaskHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	p.Tasks.LinkFileTask(taskID, fileName, taskData)
+	err = p.Tasks.LinkFileTask(taskID, fileName, taskData)
+	if err != nil {
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, err.Error(), nil)
+		loggergrpc.LC.LogError(messages.ServiceTasks, err.Error(), map[string]string{
+			messages.LogUserID:  teacherID.String(),
+			messages.LogDetails: err.Error(),
+		})
+		return
+	}
 
 	response.WriteAPIResponse(w, http.StatusCreated, true, messages.StatusTaskCreated, "id: "+taskID.String())
 	loggergrpc.LC.LogInfo(messages.ServiceTasks, messages.StatusUserTaskCreated, map[string]string{
@@ -105,7 +113,12 @@ func (p *TaskHandler) DownloadTask(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", "attachment; filename=\""+fileName+"\"")
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.WriteHeader(http.StatusOK)
-	w.Write(fileData)
+	_, err = w.Write(fileData)
+	if err != nil {
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ErrWriteFile, nil)
+		loggergrpc.LC.LogError(messages.ServiceTasks, messages.ErrWriteFile, map[string]string{messages.LogDetails: err.Error()})
+		return
+	}
 }
 
 func (p *TaskHandler) DownloadSolution(w http.ResponseWriter, r *http.Request) {
@@ -132,7 +145,12 @@ func (p *TaskHandler) DownloadSolution(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", "attachment; filename=\""+fileName+"\"")
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.WriteHeader(http.StatusOK)
-	w.Write(fileData)
+	_, err = w.Write(fileData)
+	if err != nil {
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ErrWriteFile, nil)
+		loggergrpc.LC.LogError(messages.ServiceTasks, messages.ErrWriteFile, map[string]string{messages.LogDetails: err.Error()})
+		return
+	}
 }
 
 func (p *TaskHandler) AddSolution(w http.ResponseWriter, r *http.Request) {
@@ -158,8 +176,19 @@ func (p *TaskHandler) AddSolution(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	p.Tasks.LinkFileSolution(taskID, fileName, taskData)
-	p.Tasks.Solve(taskID)
+	err = p.Tasks.LinkFileSolution(taskID, fileName, taskData)
+	if err != nil {
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, err.Error(), nil)
+		loggergrpc.LC.LogError(messages.ServiceTasks, err.Error(), map[string]string{messages.LogTaskID: taskID.String()})
+		return
+	}
+
+	err = p.Tasks.Solve(taskID)
+	if err != nil {
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, err.Error(), nil)
+		loggergrpc.LC.LogError(messages.ServiceTasks, err.Error(), map[string]string{messages.LogTaskID: taskID.String()})
+		return
+	}
 
 	response.WriteAPIResponse(w, http.StatusCreated, true, messages.StatusTaskUpdated, "id: "+taskID.String())
 	loggergrpc.LC.LogInfo(messages.ServiceTasks, messages.StatusUserSolution, map[string]string{messages.LogTaskID: taskID.String()})

@@ -86,7 +86,16 @@ func (p *UserHandler) AddRating(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	p.User.AddRating(teacherID, float32(numRating))
+	err = p.User.AddRating(teacherID, float32(numRating))
+	if err != nil {
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, err.Error(), nil)
+		loggergrpc.LC.LogError(messages.ServiceUsers, err.Error(), map[string]string{
+			messages.LogUserID + messages.RoleTeacher: teacherID.String(),
+			messages.LogUserID + messages.RoleStudent: studentID.String(),
+			messages.LogDetails:                       err.Error(),
+		})
+		return
+	}
 
 	response.WriteAPIResponse(w, http.StatusOK, true, messages.StatusRated, nil)
 	loggergrpc.LC.LogInfo(messages.ServiceUsers, messages.StatusUserRated, map[string]string{
@@ -143,7 +152,16 @@ func (p *UserHandler) AddRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	studentID := middleware.GetContext(r.Context())
-	p.User.AddRequest(studentID, teacherID)
+	err = p.User.AddRequest(studentID, teacherID)
+	if err != nil {
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, err.Error(), nil)
+		loggergrpc.LC.LogError(messages.ServiceUsers, err.Error(), map[string]string{
+			messages.LogUserID + messages.RoleTeacher: teacherID.String(),
+			messages.LogUserID + messages.RoleStudent: studentID.String(),
+			messages.LogDetails:                       err.Error(),
+		})
+		return
+	}
 
 	response.WriteAPIResponse(w, http.StatusCreated, true, messages.StatusReqSent, nil)
 	loggergrpc.LC.LogInfo(messages.ServiceUsers, messages.StatusUserReqSent, map[string]string{
@@ -200,7 +218,16 @@ func (p *UserHandler) DenyRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	teacherID := middleware.GetContext(r.Context())
-	p.User.Deny(teacherID, studentID)
+	err = p.User.Deny(teacherID, studentID)
+	if err != nil {
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, err.Error(), nil)
+		loggergrpc.LC.LogError(messages.ServiceUsers, err.Error(), map[string]string{
+			messages.LogUserID + messages.RoleTeacher: teacherID.String(),
+			messages.LogUserID + messages.RoleStudent: studentID.String(),
+			messages.LogDetails:                       err.Error(),
+		})
+		return
+	}
 
 	response.WriteAPIResponse(w, http.StatusCreated, true, messages.StatusReqDenied, nil)
 	loggergrpc.LC.LogInfo(messages.ServiceUsers, messages.StatusUserReqDenied, map[string]string{
@@ -224,7 +251,16 @@ func (p *UserHandler) CancelRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	studentID := middleware.GetContext(r.Context())
-	p.User.Deny(teacherID, studentID)
+	err = p.User.Deny(teacherID, studentID)
+	if err != nil {
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, err.Error(), nil)
+		loggergrpc.LC.LogError(messages.ServiceUsers, err.Error(), map[string]string{
+			messages.LogUserID + messages.RoleTeacher: teacherID.String(),
+			messages.LogUserID + messages.RoleStudent: studentID.String(),
+			messages.LogDetails:                       err.Error(),
+		})
+		return
+	}
 
 	response.WriteAPIResponse(w, http.StatusCreated, true, messages.StatusReqCanceled, nil)
 	loggergrpc.LC.LogInfo(messages.ServiceUsers, messages.StatusUserReqCanceled, map[string]string{
@@ -243,7 +279,15 @@ func (p *UserHandler) FillProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userID := middleware.GetContext(r.Context())
-	p.User.FillProfile(userID, user)
+	err := p.User.FillProfile(userID, user)
+	if err != nil {
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, err.Error(), nil)
+		loggergrpc.LC.LogError(messages.ServiceUsers, err.Error(), map[string]string{
+			messages.LogUserID:  userID.String(),
+			messages.LogDetails: err.Error(),
+		})
+		return
+	}
 
 	response.WriteAPIResponse(w, http.StatusOK, true, messages.StatusUpdated, nil)
 	loggergrpc.LC.LogInfo(messages.ServiceUsers, messages.StatusUserUpdated, map[string]string{messages.LogUserID: userID.String()})

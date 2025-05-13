@@ -2,7 +2,6 @@ package main
 
 import (
 	"api/internal/router"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -23,6 +22,9 @@ func main() {
 
 	router := router.CreateNewRouter()
 
-	fmt.Println("Server is running on " + apiPort)
-	http.ListenAndServe(":"+apiPort, router)
+	log.Println("Server is running on " + apiPort)
+	err := http.ListenAndServe(":"+apiPort, router)
+	if err != nil {
+		log.Fatal("Server error: ", err)
+	}
 }

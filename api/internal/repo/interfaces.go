@@ -59,6 +59,6 @@ type TaskRepo interface {
 // sessions
 type SessionRepo interface {
 	GetSession(sessionID uuid.UUID) (userID uuid.UUID, role string, err error)
-	SetSession(sessionID uuid.UUID, userID uuid.UUID, role string)
+	SetSession(sessionID uuid.UUID, userID uuid.UUID, role string) error
 	DeleteSession(sessionID uuid.UUID) (userID uuid.UUID, err error)
 }

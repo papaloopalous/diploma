@@ -17,7 +17,12 @@ func EncryptionKey(w http.ResponseWriter, r *http.Request) {
 		loggergrpc.LC.LogError(messages.ServiceEncryption, messages.ErrKey, map[string]string{messages.LogDetails: err.Error()})
 		return
 	}
-	w.Write([]byte(base64.StdEncoding.EncodeToString(key)))
+	_, err = w.Write([]byte(base64.StdEncoding.EncodeToString(key)))
+	if err != nil {
+		loggergrpc.LC.LogError(messages.ServiceEncryption, messages.ErrWriteKey, map[string]string{messages.LogDetails: err.Error()})
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ErrWriteKey, nil)
+		return
+	}
 }
 
 func serveHTML(w http.ResponseWriter, _ *http.Request, filename string) {
@@ -27,7 +32,12 @@ func serveHTML(w http.ResponseWriter, _ *http.Request, filename string) {
 		loggergrpc.LC.LogError(messages.ServiceEncryption, messages.ErrHTML, map[string]string{messages.LogDetails: err.Error()})
 		return
 	}
-	tmpl.Execute(w, nil)
+	err = tmpl.Execute(w, nil)
+	if err != nil {
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ErrPageOut, nil)
+		loggergrpc.LC.LogError(messages.ServiceEncryption, messages.ErrHTML, map[string]string{messages.LogDetails: err.Error()})
+		return
+	}
 }
 
 func OutIndex(w http.ResponseWriter, r *http.Request) {

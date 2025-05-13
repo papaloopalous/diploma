@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package sessionpb;
+
+option go_package = "./sessionpb";
+
+service SessionService {
+  rpc GetSession(SessionIDRequest) returns (SessionResponse);
+  rpc SetSession(SetSessionRequest) returns (Empty);
+  rpc DeleteSession(SessionIDRequest) returns (DeleteSessionResponse);
+}
+
+message Empty {}
+
+message SessionIDRequest {
+  string session_id = 1;
+}
+
+message SessionResponse {
+  string user_id = 1;
+  string role = 2;
+}
+
+message SetSessionRequest {
+  string session_id = 1;
+  string user_id = 2;
+  string role = 3;
+}
+
+message DeleteSessionResponse {
+  string user_id = 1;
+}

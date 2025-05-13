@@ -520,7 +520,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("unable to connect to database: %v\n", err)
 	}
-	defer conn.Close(ctx)
+
+	defer func() {
+		err := conn.Close(ctx)
+		if err != nil {
+			log.Fatalf("failed to close connection: %v\n", err)
+		}
+	}()
 
 	grpcServer := grpc.NewServer()
 	userpb.RegisterUserServiceServer(grpcServer, &server{db: conn})

@@ -50,7 +50,13 @@ func main() {
 	cfg := zap.NewProductionConfig()
 	cfg.DisableStacktrace = true
 	logger, _ = cfg.Build()
-	defer logger.Sync()
+
+	defer func() {
+		err := logger.Sync()
+		if err != nil {
+			log.Fatalf("failed to sync logger: %v", err)
+		}
+	}()
 
 	err := godotenv.Load()
 	if err != nil {

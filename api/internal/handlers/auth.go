@@ -59,7 +59,12 @@ func (p *AuthHandler) LogIN(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	p.Session.SetSession(sessionID, userID, userRole)
+	err = p.Session.SetSession(sessionID, userID, userRole)
+	if err != nil {
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ErrSessionSet, nil)
+		loggergrpc.LC.LogError(messages.ServiceAuth, messages.ErrSessionSet, map[string]string{messages.LogDetails: err.Error()})
+		return
+	}
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     messages.CookieAuthToken,
@@ -123,7 +128,12 @@ func (p *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	p.Session.SetSession(sessionID, userID, role)
+	err = p.Session.SetSession(sessionID, userID, role)
+	if err != nil {
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ErrSessionSet, nil)
+		loggergrpc.LC.LogError(messages.ServiceAuth, messages.ErrSessionSet, map[string]string{messages.LogDetails: err.Error()})
+		return
+	}
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     messages.CookieAuthToken,
@@ -148,13 +158,13 @@ func (p *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 func (p *AuthHandler) LogOUT(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie(messages.CookieAuthToken)
 	if err != nil {
-		response.WriteAPIResponse(w, http.StatusUnauthorized, false, messages.ErrNoToken, nil)
+		response.WriteAPIResponse(w, http.StatusBadRequest, false, messages.ErrNoToken, nil)
 		return
 	}
 
 	token, err := p.Token.ParseJWT(cookie.Value)
 	if err != nil {
-		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ErrBadToken, nil)
+		response.WriteAPIResponse(w, http.StatusBadRequest, false, messages.ErrBadToken, nil)
 		loggergrpc.LC.LogError(messages.ServiceAuth, messages.ErrParseToken, map[string]string{messages.LogDetails: err.Error()})
 		return
 	}
