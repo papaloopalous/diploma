@@ -1,29 +1,12 @@
 package handlers
 
 import (
-	"api/internal/encryption"
 	loggergrpc "api/internal/loggerGRPC"
 	"api/internal/messages"
 	"api/internal/response"
-	"encoding/base64"
 	"html/template"
 	"net/http"
 )
-
-func EncryptionKey(w http.ResponseWriter, r *http.Request) {
-	key, err := encryption.GetEncryptionKey()
-	if err != nil {
-		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ErrEncryption, nil)
-		loggergrpc.LC.LogError(messages.ServiceEncryption, messages.ErrKey, map[string]string{messages.LogDetails: err.Error()})
-		return
-	}
-	_, err = w.Write([]byte(base64.StdEncoding.EncodeToString(key)))
-	if err != nil {
-		loggergrpc.LC.LogError(messages.ServiceEncryption, messages.ErrWriteKey, map[string]string{messages.LogDetails: err.Error()})
-		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ErrWriteKey, nil)
-		return
-	}
-}
 
 func serveHTML(w http.ResponseWriter, _ *http.Request, filename string) {
 	tmpl, err := template.ParseFiles("assets/html/" + filename)

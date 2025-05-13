@@ -5,24 +5,19 @@ import (
 	"api/internal/proto/taskpb"
 	"context"
 	"errors"
-	"log"
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 type TaskRepoGRPC struct {
 	db taskpb.TaskServiceClient
 }
 
-func NewTaskRepo(grpcAddr string) *TaskRepoGRPC {
-	conn, err := grpc.NewClient(grpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		log.Fatalf("failed to connect to gRPC user service at %s: %v", grpcAddr, err)
+func NewTaskRepo(conn *grpc.ClientConn) *TaskRepoGRPC {
+	return &TaskRepoGRPC{
+		db: taskpb.NewTaskServiceClient(conn),
 	}
-	client := taskpb.NewTaskServiceClient(conn)
-	return &TaskRepoGRPC{db: client}
 }
 
 func (r *TaskRepoGRPC) CreateTask(teacher uuid.UUID, student uuid.UUID, name string, studentFIO string, teacherFIO string) (uuid.UUID, error) {

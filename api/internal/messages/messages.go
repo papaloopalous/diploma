@@ -60,6 +60,8 @@ const (
 const (
 	LogDetails         = "details"
 	ServiceEncryption  = "encryption"
+	ServiceHealthcheck = "healthcheck"
+	ServiceMiddleware  = "middleware"
 	ServiceAuth        = "auth"
 	ServiceTasks       = "tasks"
 	ServiceUsers       = "user"
@@ -109,6 +111,7 @@ const (
 	StatusUserReqDenied    = "request denied"
 	StatusUserReqCanceled  = "request canceled"
 	StatusUserUpdated      = "profile updated"
+	StatusHealth           = "connection %s is in state %s, attempting to reconnect"
 )
 
 // request fields

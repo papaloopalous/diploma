@@ -5,12 +5,10 @@ import (
 	"api/internal/proto/userpb"
 	"context"
 	"errors"
-	"log"
 	"sort"
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 type UserRepoGRPC struct {
@@ -19,13 +17,10 @@ type UserRepoGRPC struct {
 
 var _ UserRepo = &UserRepoGRPC{}
 
-func NewUserRepo(grpcAddr string) *UserRepoGRPC {
-	conn, err := grpc.NewClient(grpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		log.Fatalf("failed to connect to gRPC user service at %s: %v", grpcAddr, err)
+func NewUserRepo(conn *grpc.ClientConn) *UserRepoGRPC {
+	return &UserRepoGRPC{
+		db: userpb.NewUserServiceClient(conn),
 	}
-	client := userpb.NewUserServiceClient(conn)
-	return &UserRepoGRPC{db: client}
 }
 
 func (r *UserRepoGRPC) CreateAccount(username string, pass string, role string) (uuid.UUID, error) {

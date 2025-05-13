@@ -7,6 +7,7 @@ import (
 	"api/internal/repo"
 	"api/internal/response"
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -16,6 +17,30 @@ type AuthHandler struct {
 	User    repo.UserRepo
 	Token   repo.TokenRepo
 	Session repo.SessionRepo
+	secret  string
+}
+
+func (p *AuthHandler) EncryptionKey(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ClientPublic string `json:"clientPublic"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.WriteAPIResponse(w, http.StatusBadRequest, false, "Invalid request", nil)
+		return
+	}
+
+	secret, err := encryption.DeriveSharedKeyHex(req.ClientPublic)
+	if err != nil {
+		response.WriteAPIResponse(w, http.StatusBadRequest, false, "Invalid public key", nil)
+		return
+	}
+
+	p.secret = secret
+
+	response.WriteAPIResponse(w, http.StatusOK, true, "", map[string]string{
+		"serverPublic": encryption.GetServerPublicKey(),
+	})
 }
 
 func (p *AuthHandler) LogIN(w http.ResponseWriter, r *http.Request) {
@@ -26,12 +51,7 @@ func (p *AuthHandler) LogIN(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	key, err := encryption.GetEncryptionKey()
-	if err != nil {
-		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ErrDecryption, nil)
-		loggergrpc.LC.LogError(messages.ServiceAuth, messages.ErrKey, map[string]string{messages.LogDetails: err.Error()})
-		return
-	}
+	key := p.secret
 
 	encryptedUsername := requestData[messages.ReqUsername]
 	encryptedPassword := requestData[messages.ReqPassword]
@@ -94,12 +114,7 @@ func (p *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	key, err := encryption.GetEncryptionKey()
-	if err != nil {
-		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ErrDecryption, nil)
-		loggergrpc.LC.LogError(messages.ServiceAuth, messages.ErrKey, map[string]string{messages.LogDetails: err.Error()})
-		return
-	}
+	key := p.secret
 
 	encryptedUsername := requestData[messages.ReqUsername]
 	encryptedPassword := requestData[messages.ReqPassword]
@@ -111,6 +126,8 @@ func (p *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		loggergrpc.LC.LogError(messages.ServiceAuth, messages.ErrDecrypt, map[string]string{messages.LogDetails: err.Error()})
 		return
 	}
+
+	log.Println(username)
 
 	userID, err := p.User.CreateAccount(username, encryptedPassword, role)
 	if err != nil {

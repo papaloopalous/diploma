@@ -5,24 +5,19 @@ import (
 	"api/internal/proto/sessionpb"
 	"context"
 	"errors"
-	"log"
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 type SessionRepoGRPC struct {
 	db sessionpb.SessionServiceClient
 }
 
-func NewSessionRepo(grpcAddr string) *SessionRepoGRPC {
-	conn, err := grpc.NewClient(grpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		log.Fatalf("failed to connect to gRPC session service at %s: %v", grpcAddr, err)
+func NewSessionRepo(conn *grpc.ClientConn) *SessionRepoGRPC {
+	return &SessionRepoGRPC{
+		db: sessionpb.NewSessionServiceClient(conn),
 	}
-	client := sessionpb.NewSessionServiceClient(conn)
-	return &SessionRepoGRPC{db: client}
 }
 
 func (r *SessionRepoGRPC) GetSession(sessionID uuid.UUID) (userID uuid.UUID, role string, err error) {

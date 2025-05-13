@@ -25,28 +25,28 @@ func (p *MiddlewareHandler) CheckSes(w http.ResponseWriter, r *http.Request, nex
 	cookie, err := r.Cookie(messages.CookieAuthToken)
 	if err != nil {
 		response.WriteAPIResponse(w, http.StatusBadRequest, false, messages.ErrNoCookie, nil)
-		loggergrpc.LC.LogInfo(messages.ServiceAuth, messages.ErrNoAuthToken, map[string]string{messages.LogDetails: err.Error()})
+		loggergrpc.LC.LogInfo(messages.ServiceMiddleware, messages.ErrNoAuthToken, map[string]string{messages.LogDetails: err.Error()})
 		return
 	}
 
 	token, err := p.Token.ParseJWT(cookie.Value)
 	if err != nil {
 		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ErrBadToken, nil)
-		loggergrpc.LC.LogError(messages.ServiceAuth, messages.ErrParseToken, map[string]string{messages.LogDetails: err.Error()})
+		loggergrpc.LC.LogError(messages.ServiceMiddleware, messages.ErrParseToken, map[string]string{messages.LogDetails: err.Error()})
 		return
 	}
 
 	userID, role, err := p.Session.GetSession(token.SessionID)
 	if err != nil {
 		response.WriteAPIResponse(w, http.StatusUnauthorized, false, messages.ErrNoSession, nil)
-		loggergrpc.LC.LogError(messages.ServiceAuth, messages.ErrSessionNotFound, map[string]string{messages.LogSessionID: token.SessionID.String(),
+		loggergrpc.LC.LogError(messages.ServiceMiddleware, messages.ErrSessionNotFound, map[string]string{messages.LogSessionID: token.SessionID.String(),
 			messages.LogDetails: err.Error()})
 		return
 	}
 
 	if role != targetRole && targetRole != "any" {
 		response.WriteAPIResponse(w, http.StatusUnauthorized, false, messages.StatusNoPermission, nil)
-		loggergrpc.LC.LogInfo(messages.ServiceAuth, messages.StatusUserNoPermission, map[string]string{
+		loggergrpc.LC.LogInfo(messages.ServiceMiddleware, messages.StatusUserNoPermission, map[string]string{
 			messages.LogUserID:   userID.String(),
 			messages.LogUserRole: role,
 			messages.LogNeedRole: targetRole,
