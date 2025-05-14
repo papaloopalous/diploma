@@ -4,6 +4,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/md5"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
@@ -74,4 +75,39 @@ func DecryptData(cipherB64, sharedKeyHex string) (string, error) {
 		return "", err
 	}
 	return string(plain), nil
+}
+
+func pkcs7Pad(b []byte) []byte {
+	p := aes.BlockSize - len(b)%aes.BlockSize
+	for i := 0; i < p; i++ {
+		b = append(b, byte(p))
+	}
+	return b
+}
+
+func EncryptData(plaintext, sharedKeyHex string) (string, error) {
+	keyBytes, err := hex.DecodeString(sharedKeyHex)
+	if err != nil {
+		return "", fmt.Errorf("hex key: %w", err)
+	}
+	if len(keyBytes) != 32 {
+		return "", fmt.Errorf("key must be 32 bytes, got %d", len(keyBytes))
+	}
+
+	sum := sha256.Sum256(append(keyBytes, []byte(plaintext)...))
+	salt := sum[:8]
+
+	k, iv := deriveKeyAndIV(keyBytes, salt)
+
+	block, err := aes.NewCipher(k)
+	if err != nil {
+		return "", err
+	}
+	plain := pkcs7Pad([]byte(plaintext))
+	ciphertext := make([]byte, len(plain))
+	cipher.NewCBCEncrypter(block, iv).CryptBlocks(ciphertext, plain)
+
+	out := append([]byte("Salted__"), salt...)
+	out = append(out, ciphertext...)
+	return base64.StdEncoding.EncodeToString(out), nil
 }

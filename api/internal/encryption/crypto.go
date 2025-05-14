@@ -1,11 +1,12 @@
-// encryption/dh.go
 package encryption
 
 import (
+	"api/internal/response"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"math/big"
+	"net/http"
 )
 
 var (
@@ -15,6 +16,15 @@ var (
 	serverPriv, _ = new(big.Int).SetString("1234567890ABCDEF1234567890ABCDEF12345678", 16)
 	serverPub     = new(big.Int).Exp(generator, serverPriv, prime)
 )
+
+func GetCryptoParams(w http.ResponseWriter, r *http.Request) {
+	params := map[string]string{
+		"prime":     "FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD1",
+		"generator": "2",
+	}
+
+	response.WriteAPIResponse(w, http.StatusOK, true, "", params)
+}
 
 func GetServerPublicKey() string {
 	return serverPub.String()

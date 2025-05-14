@@ -7,8 +7,8 @@ import (
 	"api/internal/repo"
 	"api/internal/response"
 	"encoding/json"
-	"log"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -19,6 +19,8 @@ type AuthHandler struct {
 	Session repo.SessionRepo
 	secret  string
 }
+
+var serverSecretKey []byte = []byte("863d268fe1fbedad03c347670de5580d4c44486228c0bb8108840e08b6aea204")
 
 func (p *AuthHandler) EncryptionKey(w http.ResponseWriter, r *http.Request) {
 	var req struct {
@@ -63,7 +65,21 @@ func (p *AuthHandler) LogIN(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, userRole, err := p.User.CheckPass(username, encryptedPassword)
+	password, err := encryption.DecryptData(encryptedPassword, key)
+	if err != nil {
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ErrDecryption, nil)
+		loggergrpc.LC.LogError(messages.ServiceAuth, messages.ErrDecrypt, map[string]string{messages.LogDetails: err.Error()})
+		return
+	}
+
+	newPassword, err := encryption.EncryptData(password, string(serverSecretKey))
+	if err != nil {
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ErrEncryption, nil)
+		loggergrpc.LC.LogError(messages.ServiceAuth, messages.ErrEncryption, map[string]string{messages.LogDetails: err.Error()})
+		return
+	}
+
+	userID, userRole, err := p.User.CheckPass(username, newPassword)
 	if err != nil {
 		response.WriteAPIResponse(w, http.StatusUnauthorized, false, err.Error(), nil)
 		loggergrpc.LC.LogInfo(messages.ServiceAuth, messages.ErrAuth, map[string]string{messages.LogDetails: err.Error()})
@@ -92,6 +108,7 @@ func (p *AuthHandler) LogIN(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 		Path:     "/",
+		Expires:  time.Now().Add(10 * time.Minute),
 	})
 
 	http.SetCookie(w, &http.Cookie{
@@ -100,6 +117,7 @@ func (p *AuthHandler) LogIN(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: false,
 		SameSite: http.SameSiteLaxMode,
 		Path:     "/",
+		Expires:  time.Now().Add(10 * time.Minute),
 	})
 
 	response.WriteAPIResponse(w, http.StatusOK, true, messages.StatusAuth, nil)
@@ -127,9 +145,21 @@ func (p *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Println(username)
+	password, err := encryption.DecryptData(encryptedPassword, key)
+	if err != nil {
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ErrDecryption, nil)
+		loggergrpc.LC.LogError(messages.ServiceAuth, messages.ErrDecrypt, map[string]string{messages.LogDetails: err.Error()})
+		return
+	}
 
-	userID, err := p.User.CreateAccount(username, encryptedPassword, role)
+	newPassword, err := encryption.EncryptData(password, string(serverSecretKey))
+	if err != nil {
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ErrEncryption, nil)
+		loggergrpc.LC.LogError(messages.ServiceAuth, messages.ErrEncryption, map[string]string{messages.LogDetails: err.Error()})
+		return
+	}
+
+	userID, err := p.User.CreateAccount(username, newPassword, role)
 	if err != nil {
 		response.WriteAPIResponse(w, http.StatusBadRequest, false, err.Error(), nil)
 		loggergrpc.LC.LogInfo(messages.ServiceAuth, messages.ErrCeateAcc, map[string]string{messages.LogDetails: err.Error()})
@@ -158,6 +188,7 @@ func (p *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 		Path:     "/",
+		Expires:  time.Now().Add(10 * time.Minute),
 	})
 
 	http.SetCookie(w, &http.Cookie{
@@ -166,6 +197,7 @@ func (p *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: false,
 		SameSite: http.SameSiteLaxMode,
 		Path:     "/",
+		Expires:  time.Now().Add(10 * time.Minute),
 	})
 
 	response.WriteAPIResponse(w, http.StatusOK, true, messages.StatusAuth, nil)

@@ -1,11 +1,13 @@
 package router
 
 import (
+	"api/internal/encryption"
 	"api/internal/handlers"
 	"api/internal/healthcheck"
 	loggergrpc "api/internal/loggerGRPC"
 	"api/internal/middleware"
 	"api/internal/repo"
+	"context"
 	"log"
 	"net/http"
 	"time"
@@ -22,56 +24,56 @@ func init() {
 }
 
 func CreateNewRouter() *mux.Router {
-	userConn, err := grpc.NewClient("localhost:50052", grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		log.Fatalf("failed to connect to user service: %v", err)
-	}
-
-	sessionConn, err := grpc.NewClient("localhost:50053", grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		log.Fatalf("failed to connect to session service: %v", err)
-	}
-
-	taskConn, err := grpc.NewClient("localhost:50052", grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		log.Fatalf("failed to connect to task service: %v", err)
-	}
-
-	loggerConn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		log.Printf("failed to connect to logger service: %v", err)
-	}
-
-	// ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	// defer cancel()
-
-	// userConn, err := grpc.DialContext(ctx, "localhost:50052",
-	// 	grpc.WithTransportCredentials(insecure.NewCredentials()),
-	// 	grpc.WithBlock())
+	// userConn, err := grpc.NewClient("localhost:50052", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	// if err != nil {
 	// 	log.Fatalf("failed to connect to user service: %v", err)
 	// }
 
-	// sessionConn, err := grpc.DialContext(ctx, "localhost:50053",
-	// 	grpc.WithTransportCredentials(insecure.NewCredentials()),
-	// 	grpc.WithBlock())
+	// sessionConn, err := grpc.NewClient("localhost:50053", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	// if err != nil {
 	// 	log.Fatalf("failed to connect to session service: %v", err)
 	// }
 
-	// taskConn, err := grpc.DialContext(ctx, "localhost:50052",
-	// 	grpc.WithTransportCredentials(insecure.NewCredentials()),
-	// 	grpc.WithBlock())
+	// taskConn, err := grpc.NewClient("localhost:50052", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	// if err != nil {
 	// 	log.Fatalf("failed to connect to task service: %v", err)
 	// }
 
-	// loggerConn, err := grpc.DialContext(ctx, "localhost:50051",
-	// 	grpc.WithTransportCredentials(insecure.NewCredentials()),
-	// 	grpc.WithBlock())
+	// loggerConn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	// if err != nil {
 	// 	log.Printf("failed to connect to logger service: %v", err)
 	// }
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	userConn, err := grpc.DialContext(ctx, "localhost:50052",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock())
+	if err != nil {
+		log.Fatalf("failed to connect to user service: %v", err)
+	}
+
+	sessionConn, err := grpc.DialContext(ctx, "localhost:50053",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock())
+	if err != nil {
+		log.Fatalf("failed to connect to session service: %v", err)
+	}
+
+	taskConn, err := grpc.DialContext(ctx, "localhost:50052",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock())
+	if err != nil {
+		log.Fatalf("failed to connect to task service: %v", err)
+	}
+
+	loggerConn, err := grpc.DialContext(ctx, "localhost:50051",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock())
+	if err != nil {
+		log.Printf("failed to connect to logger service: %v", err)
+	}
 
 	healthChecker := healthcheck.NewHealthChecker(5 * time.Second)
 	healthChecker.AddConnection("user-service", userConn)
@@ -111,6 +113,7 @@ func CreateNewRouter() *mux.Router {
 	router.PathPrefix("/assets/").Handler(http.StripPrefix("/assets/", http.FileServer(http.Dir("assets"))))
 
 	router.HandleFunc("/api/key-exchange", authHandler.EncryptionKey).Methods("POST")
+	router.HandleFunc("/api/crypto-params", encryption.GetCryptoParams).Methods("GET")
 
 	router.HandleFunc("/api/login", authHandler.LogIN).Methods("POST")
 	router.HandleFunc("/api/register", authHandler.Register).Methods("POST")
