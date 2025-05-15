@@ -7,10 +7,11 @@ import (
 	"api/internal/repo"
 	"api/internal/response"
 	"encoding/json"
-	"log"
 	"net/http"
 	"sync"
 	"time"
+
+	chatpb "api/internal/proto/chatpb"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -18,12 +19,7 @@ import (
 
 type ChatHandler struct {
 	User repo.UserRepo
-}
-
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
+	Chat repo.ChatRepo
 }
 
 type Client struct {
@@ -32,7 +28,20 @@ type Client struct {
 	isActive bool
 }
 
-type Message struct {
+type Room struct {
+	clients     []*Client
+	clientsLock sync.Mutex
+	user1ID     uuid.UUID
+	user2ID     uuid.UUID
+}
+
+var (
+	upgrader = websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
+	rooms    = make(map[string]*Room)
+	roomsMu  sync.Mutex
+)
+
+type wsMessage struct {
 	ID       string    `json:"id"`
 	Type     string    `json:"type"`
 	RoomID   string    `json:"roomId"`
@@ -43,121 +52,65 @@ type Message struct {
 	Status   string    `json:"status"`
 }
 
-type Room struct {
-	clients     []*Client
-	clientsLock sync.Mutex
-	user1ID     uuid.UUID
-	user2ID     uuid.UUID
-	messages    []Message
-}
-
-var rooms = make(map[string]*Room)
-var roomsLock sync.Mutex
-
-func findRoomByUsers(user1, user2 uuid.UUID) (string, bool) {
-	roomsLock.Lock()
-	defer roomsLock.Unlock()
-
-	for roomID, room := range rooms {
-		if (room.user1ID == user1 && room.user2ID == user2) ||
-			(room.user1ID == user2 && room.user2ID == user1) {
-			return roomID, true
-		}
+func enumToClient(s chatpb.MessageStatus) string {
+	switch s {
+	case chatpb.MessageStatus_SENT:
+		return "sent"
+	case chatpb.MessageStatus_DELIVERED:
+		return "delivered"
+	case chatpb.MessageStatus_READ:
+		return "read"
+	default:
+		return "sent"
 	}
-	return "", false
 }
 
-type ChatMessage struct {
-	ID       uuid.UUID `json:"id"`
-	RoomID   string    `json:"room_id"`
-	SenderID uuid.UUID `json:"sender_id"`
-	Text     string    `json:"text"`
-	Status   string    `json:"status"`
-	SentAt   time.Time `json:"sent_at"`
-}
-
-type MessageEvent struct {
-	Type    string      `json:"type"`
-	Payload ChatMessage `json:"payload"`
-}
-
-type CreateRoomRequest struct {
+type createRoomRequest struct {
 	OtherUserID string `json:"otherUserId"`
 }
 
 func (h *ChatHandler) CreateRoom(w http.ResponseWriter, r *http.Request) {
-	var req CreateRoomRequest
+	var req createRoomRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		response.WriteAPIResponse(w, http.StatusBadRequest, false, messages.ErrBadRequest, nil)
-		loggergrpc.LC.LogError(messages.ServiceChat, messages.ErrDecodeRequest, map[string]string{
-			messages.LogDetails: err.Error(),
-		})
+		response.WriteAPIResponse(w, http.StatusBadRequest, false, messages.ErrDecodeRequest, nil)
+		loggergrpc.LC.LogError(messages.ServiceChat, messages.ErrDecodeRequest, map[string]string{messages.LogDetails: err.Error()})
 		return
 	}
 
 	userID := middleware.GetContext(r.Context())
-	if userID == uuid.Nil {
-		response.WriteAPIResponse(w, http.StatusUnauthorized, false, messages.ErrBadUserID, nil)
-		loggergrpc.LC.LogError(messages.ServiceChat, messages.ErrParseUserID, nil)
-		return
-	}
-
 	otherID, err := uuid.Parse(req.OtherUserID)
-	if err != nil {
+	if err != nil || userID == uuid.Nil {
 		response.WriteAPIResponse(w, http.StatusBadRequest, false, messages.ErrBadUserID, nil)
-		loggergrpc.LC.LogError(messages.ServiceChat, messages.ErrParseUserID, map[string]string{
-			messages.LogUserID: req.OtherUserID,
-		})
 		return
 	}
 
-	_, err = h.User.FindUser(userID)
-	if err != nil {
+	if _, err = h.User.FindUser(userID); err != nil {
 		response.WriteAPIResponse(w, http.StatusNotFound, false, messages.ErrUserNotFound, nil)
-		loggergrpc.LC.LogError(messages.ServiceChat, messages.ErrUserNotFound, map[string]string{
-			messages.LogUserID: userID.String(),
-		})
 		return
 	}
-
-	_, err = h.User.FindUser(otherID)
-	if err != nil {
+	if _, err = h.User.FindUser(otherID); err != nil {
 		response.WriteAPIResponse(w, http.StatusNotFound, false, messages.ErrUserNotFound, nil)
-		loggergrpc.LC.LogError(messages.ServiceChat, messages.ErrUserNotFound, map[string]string{
-			messages.LogUserID: otherID.String(),
-		})
 		return
 	}
 
-	if existingRoomID, found := findRoomByUsers(userID, otherID); found {
-		response.WriteAPIResponse(w, http.StatusOK, true, messages.StatusRoomExists, map[string]string{
-			"roomId": existingRoomID,
-		})
-		loggergrpc.LC.LogInfo(messages.ServiceChat, messages.StatusRoomExists, map[string]string{
-			messages.LogRoomID:  existingRoomID,
-			messages.LogUserID:  userID.String(),
-			messages.LogOtherID: otherID.String(),
-		})
+	roomID, existed, err := h.Chat.CreateRoom(userID, otherID)
+	if err != nil {
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, err.Error(), nil)
+		loggergrpc.LC.LogError(messages.ServiceChat, err.Error(), nil)
 		return
 	}
 
-	roomID := uuid.New().String()
-	roomsLock.Lock()
-	rooms[roomID] = &Room{
-		clients:  make([]*Client, 0, 2),
-		user1ID:  userID,
-		user2ID:  otherID,
-		messages: make([]Message, 0),
+	code := http.StatusCreated
+	msg := messages.StatusRoomCreated
+	if existed {
+		code = http.StatusOK
+		msg = messages.StatusRoomExists
 	}
-	roomsLock.Unlock()
 
-	response.WriteAPIResponse(w, http.StatusCreated, true, messages.StatusRoomCreated, map[string]string{
-		"roomId": roomID,
-	})
-	loggergrpc.LC.LogInfo(messages.ServiceChat, messages.StatusRoomCreated, map[string]string{
-		messages.LogRoomID:  roomID,
-		messages.LogUserID:  userID.String(),
-		messages.LogOtherID: otherID.String(),
+	response.WriteAPIResponse(w, code, true, msg, map[string]string{"roomId": roomID})
+	loggergrpc.LC.LogInfo(messages.ServiceChat, msg, map[string]string{
+		messages.LogRoomID: roomID,
+		messages.LogUserID: userID.String(), messages.LogOtherID: otherID.String(),
 	})
 }
 
@@ -171,157 +124,157 @@ func (h *ChatHandler) HandleConnection(w http.ResponseWriter, r *http.Request) {
 	currentUserID := middleware.GetContext(r.Context())
 	if currentUserID == uuid.Nil {
 		response.WriteAPIResponse(w, http.StatusUnauthorized, false, messages.ErrBadUserID, nil)
-		loggergrpc.LC.LogError(messages.ServiceChat, messages.ErrParseUserID, nil)
 		return
 	}
 
-	roomsLock.Lock()
-	room, exists := rooms[roomID]
-	if !exists {
-		roomsLock.Unlock()
-		response.WriteAPIResponse(w, http.StatusNotFound, false, messages.ErrRoomNotFound, nil)
-		loggergrpc.LC.LogError(messages.ServiceChat, messages.ErrRoomNotFound, map[string]string{
-			messages.LogRoomID: roomID,
-		})
-		return
-	}
-
-	if room.user1ID != currentUserID && room.user2ID != currentUserID {
-		roomsLock.Unlock()
+	history, err := h.Chat.History(roomID)
+	if err != nil {
 		response.WriteAPIResponse(w, http.StatusForbidden, false, messages.ErrNoRoomAccess, nil)
-		loggergrpc.LC.LogError(messages.ServiceChat, messages.ErrNoRoomAccess, map[string]string{
-			messages.LogRoomID: roomID,
-			messages.LogUserID: currentUserID.String(),
-		})
 		return
 	}
-	roomsLock.Unlock()
 
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		loggergrpc.LC.LogError(messages.ServiceChat, messages.ErrUpgradeConn, map[string]string{
-			messages.LogDetails: err.Error(),
-		})
+		loggergrpc.LC.LogError(messages.ServiceChat, messages.ErrUpgradeConn,
+			map[string]string{messages.LogDetails: err.Error()})
 		return
 	}
 	defer conn.Close()
 
-	room.clientsLock.Lock()
-	for i, existingClient := range room.clients {
-		if existingClient.userID == currentUserID {
-			room.clients = append(room.clients[:i], room.clients[i+1:]...)
-			break
-		}
-	}
-
-	activeUsers := make(map[uuid.UUID]bool)
-	for _, c := range room.clients {
-		if c.isActive {
-			activeUsers[c.userID] = true
-		}
-	}
-
-	if len(activeUsers) >= 2 {
-		room.clientsLock.Unlock()
-		conn.WriteMessage(websocket.TextMessage, []byte(messages.ErrRoomFull))
-		return
-	}
-
-	client := &Client{
-		conn:     conn,
-		userID:   currentUserID,
-		isActive: true,
-	}
-
-	for i, msg := range room.messages {
-		msgCopy := msg
-		msgCopy.IsSender = (msg.SenderID == currentUserID)
-
-		if msg.SenderID != currentUserID && msg.Status == "sent" {
-			room.messages[i].Status = "delivered"
-
-			statusUpdate := Message{
-				ID:     msg.ID,
-				Type:   "status",
-				Status: "delivered",
-			}
-
-			for _, c := range room.clients {
-				if msg.SenderID == c.userID {
-					err := c.conn.WriteJSON(statusUpdate)
-					if err != nil {
-						log.Printf("Error sending status update: %v", err)
-					}
+	roomsMu.Lock()
+	room := rooms[roomID]
+	if room == nil {
+		var u1, u2 uuid.UUID
+		if len(history) != 0 {
+			u1 = history[0].SenderID
+			for _, m := range history {
+				if m.SenderID != u1 {
+					u2 = m.SenderID
 					break
 				}
 			}
 		}
+		room = &Room{user1ID: u1, user2ID: u2}
+		rooms[roomID] = room
+	}
+	roomsMu.Unlock()
 
-		err := conn.WriteJSON(msgCopy)
-		if err != nil {
-			log.Printf("Error sending history: %v", err)
+	room.clientsLock.Lock()
+	for i, c := range room.clients {
+		if c.userID == currentUserID {
+			room.clients = append(room.clients[:i], room.clients[i+1:]...)
+			break
 		}
 	}
-
+	client := &Client{conn: conn, userID: currentUserID, isActive: true}
 	room.clients = append(room.clients, client)
 	room.clientsLock.Unlock()
 
-	loggergrpc.LC.LogInfo(messages.ServiceChat, messages.StatusUserConnected, map[string]string{
-		messages.LogRoomID: roomID,
-	})
+	loggergrpc.LC.LogInfo(messages.ServiceChat, messages.StatusUserConnected,
+		map[string]string{messages.LogRoomID: roomID, messages.LogUserID: currentUserID.String()})
 
-	for {
-		var message Message
-		err := conn.ReadJSON(&message)
-		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
-				log.Printf("Unexpected close error: %v", err)
-			}
-			client.isActive = false
-			break
-		}
-
-		if message.Type == "message" {
-			message.ID = uuid.New().String()
-			message.SentAt = time.Now()
-			message.SenderID = currentUserID
-			message.RoomID = roomID
-			message.Status = "sent"
-			message.IsSender = true
-
-			conn.WriteJSON(message)
+	for i, m := range history {
+		if m.Status == chatpb.MessageStatus_SENT && m.SenderID != currentUserID {
+			// в БД
+			_ = h.Chat.UpdateStatus(m.ID, chatpb.MessageStatus_DELIVERED)
+			history[i].Status = chatpb.MessageStatus_DELIVERED
 
 			room.clientsLock.Lock()
-			room.messages = append(room.messages, message)
-
 			for _, c := range room.clients {
-				if c.userID != currentUserID && c.isActive {
-					msgCopy := message
-					msgCopy.IsSender = false
-					err := c.conn.WriteJSON(msgCopy)
-					if err != nil {
-						log.Printf("Error sending message: %v", err)
-						continue
-					}
-
-					message.Status = "delivered"
-					err = conn.WriteJSON(Message{
-						ID:     message.ID,
+				if c.userID == m.SenderID && c.isActive {
+					_ = c.conn.WriteJSON(wsMessage{
+						ID:     m.ID.String(),
 						Type:   "status",
 						Status: "delivered",
 					})
-					if err != nil {
-						log.Printf("Error sending status update: %v", err)
-					}
+					break
 				}
 			}
 			room.clientsLock.Unlock()
 		}
 	}
 
+	for _, m := range history {
+		_ = conn.WriteJSON(wsMessage{
+			ID:       m.ID.String(),
+			Type:     "message",
+			RoomID:   roomID,
+			SenderID: m.SenderID,
+			Text:     m.Text,
+			SentAt:   m.SentAt,
+			IsSender: m.SenderID == currentUserID,
+			Status:   enumToClient(m.Status),
+		})
+	}
+
+	for {
+		var incoming wsMessage
+		if err := conn.ReadJSON(&incoming); err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
+				loggergrpc.LC.LogError(messages.ServiceChat, err.Error(), nil)
+			}
+			client.isActive = false
+			break
+		}
+
+		if incoming.Type != "message" {
+			continue
+		}
+
+		newMsg := repo.ChatMessage{
+			ID:       uuid.New(),
+			RoomID:   roomID,
+			SenderID: currentUserID,
+			Text:     incoming.Text,
+			SentAt:   time.Now(),
+			Status:   chatpb.MessageStatus_SENT,
+		}
+
+		if err := h.Chat.SaveMessage(newMsg); err != nil {
+			loggergrpc.LC.LogError(messages.ServiceChat, err.Error(), nil)
+			continue
+		}
+
+		_ = conn.WriteJSON(wsMessage{
+			ID:       newMsg.ID.String(),
+			Type:     "message",
+			RoomID:   roomID,
+			SenderID: currentUserID,
+			Text:     newMsg.Text,
+			SentAt:   newMsg.SentAt,
+			IsSender: true,
+			Status:   "sent",
+		})
+
+		room.clientsLock.Lock()
+		for _, c := range room.clients {
+			if c.userID == currentUserID || !c.isActive {
+				continue
+			}
+			if err := c.conn.WriteJSON(wsMessage{
+				ID:       newMsg.ID.String(),
+				Type:     "message",
+				RoomID:   roomID,
+				SenderID: currentUserID,
+				Text:     newMsg.Text,
+				SentAt:   newMsg.SentAt,
+				IsSender: false,
+				Status:   "sent",
+			}); err == nil {
+				_ = h.Chat.UpdateStatus(newMsg.ID, chatpb.MessageStatus_DELIVERED)
+				_ = conn.WriteJSON(wsMessage{
+					ID:     newMsg.ID.String(),
+					Type:   "status",
+					Status: "delivered",
+				})
+			}
+		}
+		room.clientsLock.Unlock()
+	}
+
 	room.clientsLock.Lock()
 	for i, c := range room.clients {
-		if c.conn == conn {
+		if c == client {
 			room.clients = append(room.clients[:i], room.clients[i+1:]...)
 			break
 		}

@@ -54,6 +54,13 @@ func CreateNewRouter() *mux.Router {
 		log.Fatalf("failed to connect to user service: %v", err)
 	}
 
+	chatConn, err := grpc.DialContext(ctx, "localhost:50052",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock())
+	if err != nil {
+		log.Fatalf("failed to connect to chat service: %v", err)
+	}
+
 	sessionConn, err := grpc.DialContext(ctx, "localhost:50053",
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock())
@@ -62,13 +69,6 @@ func CreateNewRouter() *mux.Router {
 	}
 
 	taskConn, err := grpc.DialContext(ctx, "localhost:50052",
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock())
-	if err != nil {
-		log.Fatalf("failed to connect to task service: %v", err)
-	}
-
-	chatConn, err := grpc.DialContext(ctx, "localhost:50052",
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock())
 	if err != nil {
@@ -94,6 +94,7 @@ func CreateNewRouter() *mux.Router {
 	userRepo := repo.NewUserRepo(userConn)
 	sessionRepo := repo.NewSessionRepo(sessionConn)
 	taskRepo := repo.NewTaskRepo(taskConn)
+	chatRepo := repo.NewChatRepo(chatConn)
 
 	authHandler := &handlers.AuthHandler{
 		User:    userRepo,
@@ -118,6 +119,7 @@ func CreateNewRouter() *mux.Router {
 
 	chatHandler := &handlers.ChatHandler{
 		User: userRepo,
+		Chat: chatRepo,
 	}
 
 	router := mux.NewRouter()

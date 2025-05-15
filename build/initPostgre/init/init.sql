@@ -29,3 +29,19 @@ CREATE TABLE IF NOT EXISTS tasks (
     FOREIGN KEY (teacher_id) REFERENCES users(id),
     FOREIGN KEY (student_id) REFERENCES users(id)
 );
+
+CREATE TABLE IF NOT EXISTS chat_rooms (
+  id        UUID PRIMARY KEY,
+  user1_id  UUID NOT NULL,
+  user2_id  UUID NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS chat_messages (
+  id        UUID PRIMARY KEY,
+  room_id   UUID REFERENCES chat_rooms(id) ON DELETE CASCADE,
+  sender_id UUID NOT NULL,
+  text      TEXT NOT NULL,
+  sent_at   TIMESTAMPTZ NOT NULL,
+  status    SMALLINT NOT NULL -- 1-sent, 2-delivered, 3-read
+);

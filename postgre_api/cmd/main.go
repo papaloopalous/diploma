@@ -6,18 +6,22 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"postgre_api/chatpb"
 	"postgre_api/taskpb"
 	"postgre_api/userpb"
+	"time"
 
 	"github.com/google/uuid"
 	pgx "github.com/jackc/pgx/v5"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type server struct {
 	userpb.UnimplementedUserServiceServer
 	taskpb.UnimplementedTaskServiceServer
+	chatpb.UnimplementedChatServiceServer
 	db *pgx.Conn
 }
 
@@ -37,7 +41,7 @@ func (s *server) GetUserLinks(ctx context.Context, req *userpb.UserIDRequest) (*
 	var teachers, requests []uuid.UUID
 
 	err := s.db.QueryRow(ctx, `
-        SELECT teachers FROM users WHERE id = $1
+        SELECT students FROM users WHERE id = $1
     `, req.Id).Scan(&teachers)
 	if err != nil {
 		return nil, err
@@ -236,7 +240,7 @@ func (s *server) GetAvailableTeachers(ctx context.Context, req *userpb.Available
 	rows, err := s.db.Query(ctx, `
         SELECT id, fio, age, specialty, price, rating
         FROM users 
-        WHERE role = 'teacher' AND ($1 = '' OR specialty = $1) AND id != ANY($2)
+        WHERE role = 'teacher' AND ($1 = '' OR specialty = $1) AND id != ALL($2)
     `, req.Specialty, req.Exclude)
 	if err != nil {
 		return nil, err
@@ -513,6 +517,117 @@ func (s *server) AllTasks(ctx context.Context, req *taskpb.UserIDRequest) (*task
 	return &taskpb.TaskListResponse{Tasks: tasks}, nil
 }
 
+func (s *server) CreateRoom(ctx context.Context,
+	req *chatpb.CreateRoomRequest) (*chatpb.CreateRoomResponse, error) {
+
+	var roomID uuid.UUID
+	err := s.db.QueryRow(ctx, `
+		SELECT id FROM chat_rooms
+		WHERE (user1_id = $1 AND user2_id = $2)
+		   OR (user1_id = $2 AND user2_id = $1)
+	`, req.User1Id, req.User2Id).Scan(&roomID)
+
+	switch err {
+	case nil:
+		return &chatpb.CreateRoomResponse{
+			RoomId:        roomID.String(),
+			AlreadyExists: true,
+		}, nil
+	case pgx.ErrNoRows:
+		roomID = uuid.New()
+		_, err = s.db.Exec(ctx, `
+			INSERT INTO chat_rooms (id, user1_id, user2_id)
+			VALUES ($1, $2, $3)
+		`, roomID, req.User1Id, req.User2Id)
+		if err != nil {
+			return nil, err
+		}
+		return &chatpb.CreateRoomResponse{
+			RoomId:        roomID.String(),
+			AlreadyExists: false,
+		}, nil
+	default:
+		return nil, err
+	}
+}
+
+func (s *server) History(ctx context.Context,
+	req *chatpb.RoomIDRequest) (*chatpb.HistoryResponse, error) {
+
+	rows, err := s.db.Query(ctx, `
+		SELECT id, sender_id, text, sent_at, status
+		FROM chat_messages
+		WHERE room_id = $1
+		ORDER BY sent_at
+	`, req.RoomId)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var msgs []*chatpb.MessageInfo
+	for rows.Next() {
+		var (
+			id, senderID uuid.UUID
+			text         string
+			sentAt       time.Time
+			status       int16
+		)
+		if err = rows.Scan(&id, &senderID, &text, &sentAt, &status); err != nil {
+			return nil, err
+		}
+		msgs = append(msgs, &chatpb.MessageInfo{
+			Id:       id.String(),
+			RoomId:   req.RoomId,
+			SenderId: senderID.String(),
+			Text:     text,
+			SentAt:   timestamppb.New(sentAt),
+			Status:   chatpb.MessageStatus(status),
+		})
+	}
+	return &chatpb.HistoryResponse{Messages: msgs}, nil
+}
+
+func (s *server) SendMessage(ctx context.Context,
+	req *chatpb.SendMessageRequest) (*chatpb.Empty, error) {
+
+	m := req.GetMessage()
+	if m.Id == "" {
+		m.Id = uuid.New().String()
+	}
+	if m.SentAt == nil {
+		m.SentAt = timestamppb.Now()
+	}
+	if m.Status == chatpb.MessageStatus_UNKNOWN {
+		m.Status = chatpb.MessageStatus_SENT
+	}
+
+	_, err := s.db.Exec(ctx, `
+		INSERT INTO chat_messages
+		    (id, room_id, sender_id, text, sent_at, status)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`, m.Id, m.RoomId, m.SenderId, m.Text,
+		m.SentAt.AsTime(), int16(m.Status))
+	if err != nil {
+		return nil, err
+	}
+	return &chatpb.Empty{}, nil
+}
+
+func (s *server) UpdateStatus(ctx context.Context,
+	req *chatpb.UpdateStatusRequest) (*chatpb.Empty, error) {
+
+	_, err := s.db.Exec(ctx, `
+		UPDATE chat_messages
+		SET status = $1
+		WHERE id = $2
+	`, int16(req.Status), req.Id)
+	if err != nil {
+		return nil, err
+	}
+	return &chatpb.Empty{}, nil
+}
+
 func main() {
 	ctx := context.Background()
 
@@ -529,8 +644,10 @@ func main() {
 	}()
 
 	grpcServer := grpc.NewServer()
-	userpb.RegisterUserServiceServer(grpcServer, &server{db: conn})
-	taskpb.RegisterTaskServiceServer(grpcServer, &server{db: conn})
+	server := &server{db: conn}
+	userpb.RegisterUserServiceServer(grpcServer, server)
+	taskpb.RegisterTaskServiceServer(grpcServer, server)
+	chatpb.RegisterChatServiceServer(grpcServer, server)
 
 	reflection.Register(grpcServer)
 

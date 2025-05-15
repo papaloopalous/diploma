@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package chatpb;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "/chatpb";
+
+service ChatService {
+  rpc CreateRoom (CreateRoomRequest) returns (CreateRoomResponse);
+
+  rpc History (RoomIDRequest) returns (HistoryResponse);
+
+  rpc SendMessage (SendMessageRequest) returns (Empty);
+
+  rpc UpdateStatus (UpdateStatusRequest) returns (Empty);
+}
+
+message Empty {}
+
+message CreateRoomRequest {
+  string user1_id = 1;
+  string user2_id = 2;
+}
+
+message CreateRoomResponse {
+  string room_id        = 1;
+  bool   already_exists = 2;
+}
+
+message RoomIDRequest {
+  string room_id = 1;
+}
+
+enum MessageStatus {
+  UNKNOWN   = 0;
+  SENT      = 1;
+  DELIVERED = 2;
+  READ      = 3;
+}
+
+message MessageInfo {
+  string                        id        = 1;
+  string                        room_id   = 2;
+  string                        sender_id = 3;
+  string                        text      = 4;
+  google.protobuf.Timestamp     sent_at   = 5;
+  MessageStatus                 status    = 6;
+}
+
+message HistoryResponse {
+  repeated MessageInfo messages = 1;
+}
+
+message SendMessageRequest {
+  MessageInfo message = 1;
+}
+
+message UpdateStatusRequest {
+  string        id     = 1;
+  MessageStatus status = 2;
+}

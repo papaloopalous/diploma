@@ -1,6 +1,9 @@
 package repo
 
 import (
+	"api/internal/proto/chatpb"
+	"time"
+
 	"github.com/google/uuid"
 )
 
@@ -61,4 +64,21 @@ type SessionRepo interface {
 	GetSession(sessionID uuid.UUID) (userID uuid.UUID, role string, err error)
 	SetSession(sessionID uuid.UUID, userID uuid.UUID, role string) error
 	DeleteSession(sessionID uuid.UUID) (userID uuid.UUID, err error)
+}
+
+// chat
+type ChatMessage struct {
+	ID       uuid.UUID
+	RoomID   string
+	SenderID uuid.UUID
+	Text     string
+	SentAt   time.Time
+	Status   chatpb.MessageStatus
+}
+
+type ChatRepo interface {
+	CreateRoom(user1, user2 uuid.UUID) (roomID string, existed bool, err error)
+	History(roomID string) ([]ChatMessage, error)
+	SaveMessage(msg ChatMessage) error
+	UpdateStatus(msgID uuid.UUID, status chatpb.MessageStatus) error
 }
