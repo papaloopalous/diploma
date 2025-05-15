@@ -152,6 +152,33 @@ async function loadStudents() {
   }
 }
 
+async function startChat(otherUserId) {
+  try {
+    const res = await fetch('/api/create-chat-room', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ otherUserId })
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      alert('Ошибка при создании чата: ' + text);
+      return;
+    }
+
+    const data = await res.json();
+    if (!data.success) {
+      alert('Не удалось создать чат: ' + data.message);
+      return;
+    }
+
+    window.location.href = `/chat?room=${data.data.roomId}`;
+  } catch (err) {
+    alert('Ошибка при создании чата: ' + err.message);
+  }
+}
+
 function renderStudents(users) {
   const container = document.getElementById('studentsList');
   container.innerHTML = '';
@@ -167,7 +194,7 @@ function renderStudents(users) {
     btnTask.onclick = () => goToTaskPage(u);
     const btnChat = document.createElement('button');
     btnChat.textContent = 'Начать чат';
-    btnChat.onclick = () => alert('Чат не реализован');
+    btnChat.onclick = () => startChat(u.id);
     div.appendChild(document.createElement('br'));
     div.appendChild(btnTask);
     div.appendChild(btnChat);
@@ -437,7 +464,7 @@ function renderMyTeachers(teachers) {
     div.textContent = `ФИО: ${t.fio}, Возраст: ${t.age}, Специальность: ${t.specialty || '-'}, Цена: ${t.price}, Рейтинг: ${t.rating}`;
     const btnChat = document.createElement('button');
     btnChat.textContent = 'Начать чат';
-    btnChat.onclick = () => alert('Чат не реализован');
+    btnChat.onclick = () => startChat(t.id);
     div.appendChild(document.createElement('br'));
     div.appendChild(btnChat);
     const btnAddRating = document.createElement('button');

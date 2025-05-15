@@ -68,6 +68,13 @@ func CreateNewRouter() *mux.Router {
 		log.Fatalf("failed to connect to task service: %v", err)
 	}
 
+	chatConn, err := grpc.DialContext(ctx, "localhost:50052",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock())
+	if err != nil {
+		log.Fatalf("failed to connect to task service: %v", err)
+	}
+
 	loggerConn, err := grpc.DialContext(ctx, "localhost:50051",
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock())
@@ -78,6 +85,7 @@ func CreateNewRouter() *mux.Router {
 	healthChecker := healthcheck.NewHealthChecker(5 * time.Second)
 	healthChecker.AddConnection("user-service", userConn)
 	healthChecker.AddConnection("task-service", taskConn)
+	healthChecker.AddConnection("chat-service", chatConn)
 	healthChecker.AddConnection("session-service", sessionConn)
 	healthChecker.AddConnection("logger-service", loggerConn)
 
@@ -108,6 +116,10 @@ func CreateNewRouter() *mux.Router {
 		Token:   tokenRepo,
 	}
 
+	chatHandler := &handlers.ChatHandler{
+		User: userRepo,
+	}
+
 	router := mux.NewRouter()
 
 	router.PathPrefix("/assets/").Handler(http.StripPrefix("/assets/", http.FileServer(http.Dir("assets"))))
@@ -126,6 +138,8 @@ func CreateNewRouter() *mux.Router {
 	userRouter.HandleFunc("/api/get-profile", userHandler.GetProfile).Methods("GET")
 	userRouter.HandleFunc("/api/get-tasks", taskHandler.OutAllTasks).Methods("GET")
 	userRouter.HandleFunc("/api/download-task", taskHandler.DownloadTask).Methods("GET")
+	userRouter.HandleFunc("/ws", chatHandler.HandleConnection).Methods("GET")
+	userRouter.HandleFunc("/api/create-chat-room", chatHandler.CreateRoom).Methods("POST")
 
 	//for students
 	studentRouter := router.NewRoute().Subrouter()

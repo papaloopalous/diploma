@@ -14,6 +14,8 @@ type SessionRepoGRPC struct {
 	db sessionpb.SessionServiceClient
 }
 
+var _ SessionRepo = &SessionRepoGRPC{}
+
 func NewSessionRepo(conn *grpc.ClientConn) *SessionRepoGRPC {
 	return &SessionRepoGRPC{
 		db: sessionpb.NewSessionServiceClient(conn),

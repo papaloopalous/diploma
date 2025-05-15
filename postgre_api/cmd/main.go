@@ -236,7 +236,7 @@ func (s *server) GetAvailableTeachers(ctx context.Context, req *userpb.Available
 	rows, err := s.db.Query(ctx, `
         SELECT id, fio, age, specialty, price, rating
         FROM users 
-        WHERE role = 'teacher' AND ($1 = '' OR specialty = $1) AND id != ALL($2)
+        WHERE role = 'teacher' AND ($1 = '' OR specialty = $1) AND id != ANY($2)
     `, req.Specialty, req.Exclude)
 	if err != nil {
 		return nil, err

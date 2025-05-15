@@ -14,6 +14,8 @@ type TaskRepoGRPC struct {
 	db taskpb.TaskServiceClient
 }
 
+var _ TaskRepo = &TaskRepoGRPC{}
+
 func NewTaskRepo(conn *grpc.ClientConn) *TaskRepoGRPC {
 	return &TaskRepoGRPC{
 		db: taskpb.NewTaskServiceClient(conn),

@@ -46,7 +46,7 @@ func (p *TokenData) GenerateJWT(sessionID uuid.UUID) (string, error) {
 	claims := MyClaims{
 		SessionID: sessionID,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(10 * time.Second)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(10 * time.Minute)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}

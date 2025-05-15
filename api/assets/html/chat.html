@@ -3,84 +3,265 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Простой чат</title>
+    <title>Chat</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; }
-        #chat-box { 
-            width: 80%; 
-            height: 300px; 
-            border: 1px solid #000; 
-            overflow-y: auto; 
-            margin: 10px auto; 
-            padding: 10px;
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #f0f2f5;
+            height: 100vh;
             display: flex;
             flex-direction: column;
         }
+
+        .chat-container {
+            flex: 1;
+            max-width: 1000px;
+            margin: 20px auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-header {
+            padding: 16px;
+            background: #ffffff;
+            border-bottom: 1px solid #e4e6eb;
+            display: flex;
+            align-items: center;
+        }
+
+        .chat-header h2 {
+            margin-left: 12px;
+            font-size: 16px;
+            color: #050505;
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
         .message {
-            max-width: 70%;
+            max-width: 60%;
             padding: 8px 12px;
-            margin: 5px;
-            border-radius: 10px;
+            border-radius: 18px;
+            position: relative;
             word-wrap: break-word;
         }
-        .sent {
+
+        .message-sent {
             align-self: flex-end;
-            background-color: #0084ff;
+            background: #0084ff;
             color: white;
+            margin-left: 40px;
         }
-        .received {
+
+        .message-received {
             align-self: flex-start;
-            background-color: #f1f1f1;
-            color: black;
+            background: #e4e6eb;
+            color: #050505;
+            margin-right: 40px;
         }
-        #message { width: 60%; padding: 5px; }
-        #send { padding: 5px 10px; }
+
+        .message-status {
+            font-size: 11px;
+            color: #65676b;
+            text-align: right;
+            margin-top: 4px;
+        }
+
+        .message-time {
+            font-size: 11px;
+            color: #65676b;
+            margin-top: 4px;
+        }
+
+        .chat-input {
+            padding: 16px;
+            background: #ffffff;
+            border-top: 1px solid #e4e6eb;
+            display: flex;
+            gap: 8px;
+        }
+
+        .chat-input input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #e4e6eb;
+            border-radius: 20px;
+            outline: none;
+            font-size: 15px;
+        }
+
+        .chat-input input:focus {
+            border-color: #0084ff;
+        }
+
+        .chat-input button {
+            padding: 8px 16px;
+            background: #0084ff;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .chat-input button:hover {
+            background: #0073e6;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-left: 4px;
+        }
+
+        .status-online {
+            background: #31a24c;
+        }
+
+        .status-offline {
+            background: #65676b;
+        }
+
+        .message-status[data-status="sent"] {
+            color: rgba(255, 255, 255, 0.5);
+        }
+        .message-status[data-status="delivered"] {
+            color: rgba(255, 255, 255, 1);
+        }
     </style>
 </head>
 <body>
-    <h1>WebSocket Чат</h1>
-    <div id="chat-box"></div>
-    <input type="text" id="message" placeholder="Введите сообщение...">
-    <button id="send">Отправить</button>
+    <div class="chat-container">
+        <div class="chat-header">
+            <div class="status-indicator status-online"></div>
+            <h2 id="chat-title">Chat Room</h2>
+        </div>
+
+        <div class="chat-messages" id="chat-messages"></div>
+
+        <div class="chat-input">
+            <input 
+                type="text" 
+                id="message-input" 
+                placeholder="Type a message..." 
+                autocomplete="off"
+            >
+            <button id="send-button">Send</button>
+        </div>
+    </div>
 
     <script>
-        let ws = new WebSocket("ws://localhost:1488/ws");
+        const messageTemplate = (message) => `
+            <div class="message ${message.isSender ? 'message-sent' : 'message-received'}" data-message-id="${message.id}">
+                ${message.text}
+                <div class="message-time">
+                    ${new Date(message.sentAt).toLocaleTimeString()}
+                </div>
+                ${message.isSender ? `
+                    <div class="message-status" data-status="${message.status}">
+                        ${getStatusIcon(message.status)}
+                    </div>
+                ` : ''}
+            </div>
+        `;
 
-        ws.onopen = () => {
-            console.log("Соединение установлено.");
+        const getStatusIcon = (status) => {
+            switch (status) {
+                case 'sent': return '✓';
+                case 'delivered': return '✓✓';
+                default: return '✓';
+            }
         };
 
-        ws.onmessage = (event) => {
-            let chatBox = document.getElementById("chat-box");
-            let msg = document.createElement("div");
-            msg.textContent = event.data;
-            msg.classList.add("message", "received");
-            chatBox.appendChild(msg);
-            chatBox.scrollTop = chatBox.scrollHeight;
+        let ws;
+        const connectWebSocket = () => {
+            const roomId = new URLSearchParams(window.location.search).get('room');
+            if (!roomId) {
+                console.error('No room ID provided');
+                return;
+            }
+
+            ws = new WebSocket(`ws://localhost:8080/ws?room=${roomId}`);
+            
+            ws.onopen = () => {
+                console.log("Connected to chat");
+                document.querySelector('.status-indicator').classList.replace('status-offline', 'status-online');
+            };
+
+            ws.onclose = () => {
+                console.log("Disconnected from chat");
+                document.querySelector('.status-indicator').classList.replace('status-online', 'status-offline');
+                setTimeout(connectWebSocket, 3000);
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const message = JSON.parse(event.data);
+                    const chatMessages = document.getElementById('chat-messages');
+                    
+                    if (message.type === 'message') {
+                        const messageElement = document.createElement('div');
+                        messageElement.innerHTML = messageTemplate(message);
+                        chatMessages.appendChild(messageElement);
+                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                    } else if (message.type === 'status') {
+                        // Update existing message status
+                        const messageEl = document.querySelector(`[data-message-id="${message.id}"]`);
+                        if (messageEl) {
+                            const statusEl = messageEl.querySelector('.message-status');
+                            if (statusEl) {
+                                statusEl.setAttribute('data-status', message.status);
+                                statusEl.innerHTML = getStatusIcon(message.status);
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.error('Failed to parse message:', err);
+                }
+            };
         };
 
-        ws.onclose = () => {
-            console.log("Соединение закрыто.");
-        };
+        document.getElementById('send-button').addEventListener('click', () => {
+            const input = document.getElementById('message-input');
+            const text = input.value.trim();
+            
+            if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
 
-        document.getElementById("send").addEventListener("click", () => {
-            let messageInput = document.getElementById("message");
-            let message = messageInput.value;
-            if (message) {
-                let chatBox = document.getElementById("chat-box");
+            const message = {
+                type: 'message',
+                text: text,
+                sentAt: new Date().toISOString()
+            };
 
-                // Отображаем отправленное сообщение справа
-                let sentMsg = document.createElement("div");
-                sentMsg.textContent = message;
-                sentMsg.classList.add("message", "sent");
-                chatBox.appendChild(sentMsg);
-                chatBox.scrollTop = chatBox.scrollHeight;
+            ws.send(JSON.stringify(message));
+            input.value = '';
+        });
 
-                // Отправляем сообщение серверу
-                ws.send(message);
-                messageInput.value = "";
+        document.getElementById('message-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('send-button').click();
             }
         });
+
+        try {
+            connectWebSocket();
+        } catch (err) {
+            console.error('Failed to connect:', err);
+        }
     </script>
 </body>
 </html>
