@@ -4,26 +4,27 @@ import (
 	"api/internal/router"
 	"log"
 	"net/http"
-	"os"
 
-	"github.com/joho/godotenv"
+	"github.com/spf13/viper"
 )
 
 func init() {
-	err := godotenv.Load()
+	viper.SetConfigFile("./config/config.yaml")
+	err := viper.ReadInConfig()
+
 	if err != nil {
-		log.Fatal(".env was not found")
+		log.Fatalf("failed to read config: %v", err)
 	}
 }
 
 func main() {
 
-	apiPort := os.Getenv("API_PORT")
+	apiPort := viper.GetString("api.port")
 
 	router := router.CreateNewRouter()
 
 	log.Println("Server is running on " + apiPort)
-	err := http.ListenAndServe(":"+apiPort, router)
+	err := http.ListenAndServe(apiPort, router)
 	if err != nil {
 		log.Fatal("Server error: ", err)
 	}

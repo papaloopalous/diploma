@@ -13,75 +13,74 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+// tokenRepo хранит глобальный репозиторий для работы с JWT токенами
 var tokenRepo = repo.NewTokenRepo()
 
+var coef int // коэффициент для таймаута соединения с микросервисами
+
+// Адреса микросервисов
+var userAddr, chatAddr, sessionAddr, taskAddr, loggerAddr string
+
+// init инициализирует секретный ключ для JWT токенов
 func init() {
-	tokenRepo.SetData("biba")
+	tokenRepo.SetData("secret jwt key")
+	coef = viper.GetInt("api.timeout")
+	userAddr = viper.GetString("user.addr")
+	chatAddr = viper.GetString("chat.addr")
+	sessionAddr = viper.GetString("session.addr")
+	taskAddr = viper.GetString("task.addr")
+	loggerAddr = viper.GetString("logger.addr")
 }
 
+// CreateNewRouter создает и настраивает роутер приложения
+// Устанавливает соединения с микросервисами, инициализирует обработчики и настраивает маршруты
 func CreateNewRouter() *mux.Router {
-	// userConn, err := grpc.NewClient("localhost:50052", grpc.WithTransportCredentials(insecure.NewCredentials()))
-	// if err != nil {
-	// 	log.Fatalf("failed to connect to user service: %v", err)
-	// }
-
-	// sessionConn, err := grpc.NewClient("localhost:50053", grpc.WithTransportCredentials(insecure.NewCredentials()))
-	// if err != nil {
-	// 	log.Fatalf("failed to connect to session service: %v", err)
-	// }
-
-	// taskConn, err := grpc.NewClient("localhost:50052", grpc.WithTransportCredentials(insecure.NewCredentials()))
-	// if err != nil {
-	// 	log.Fatalf("failed to connect to task service: %v", err)
-	// }
-
-	// loggerConn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
-	// if err != nil {
-	// 	log.Printf("failed to connect to logger service: %v", err)
-	// }
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	// Создаем контекст с таймаутом для установки соединений
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(coef)*time.Second)
 	defer cancel()
 
-	userConn, err := grpc.DialContext(ctx, "localhost:50052",
+	// Устанавливаем соединения с микросервисами
+	userConn, err := grpc.DialContext(ctx, userAddr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock())
 	if err != nil {
 		log.Fatalf("failed to connect to user service: %v", err)
 	}
 
-	chatConn, err := grpc.DialContext(ctx, "localhost:50052",
+	chatConn, err := grpc.DialContext(ctx, chatAddr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock())
 	if err != nil {
 		log.Fatalf("failed to connect to chat service: %v", err)
 	}
 
-	sessionConn, err := grpc.DialContext(ctx, "localhost:50053",
+	sessionConn, err := grpc.DialContext(ctx, sessionAddr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock())
 	if err != nil {
 		log.Fatalf("failed to connect to session service: %v", err)
 	}
 
-	taskConn, err := grpc.DialContext(ctx, "localhost:50052",
+	taskConn, err := grpc.DialContext(ctx, taskAddr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock())
 	if err != nil {
 		log.Fatalf("failed to connect to task service: %v", err)
 	}
 
-	loggerConn, err := grpc.DialContext(ctx, "localhost:50051",
+	loggerConn, err := grpc.DialContext(ctx, loggerAddr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock())
 	if err != nil {
 		log.Printf("failed to connect to logger service: %v", err)
 	}
 
+	// Инициализируем проверку здоровья сервисов
 	healthChecker := healthcheck.NewHealthChecker(5 * time.Second)
 	healthChecker.AddConnection("user-service", userConn)
 	healthChecker.AddConnection("task-service", taskConn)
@@ -91,11 +90,13 @@ func CreateNewRouter() *mux.Router {
 
 	loggergrpc.LC = loggergrpc.NewLogClient(loggerConn)
 
+	// Создаем репозитории для работы с данными
 	userRepo := repo.NewUserRepo(userConn)
 	sessionRepo := repo.NewSessionRepo(sessionConn)
 	taskRepo := repo.NewTaskRepo(taskConn)
 	chatRepo := repo.NewChatRepo(chatConn)
 
+	// Создаем обработчики запросов
 	authHandler := &handlers.AuthHandler{
 		User:    userRepo,
 		Token:   tokenRepo,
@@ -122,10 +123,13 @@ func CreateNewRouter() *mux.Router {
 		Chat: chatRepo,
 	}
 
+	// Создаем основной роутер
 	router := mux.NewRouter()
 
+	// Настраиваем раздачу статических файлов
 	router.PathPrefix("/assets/").Handler(http.StripPrefix("/assets/", http.FileServer(http.Dir("assets"))))
 
+	// Маршруты для шифрования и аутентификации
 	router.HandleFunc("/api/key-exchange", authHandler.EncryptionKey).Methods("POST")
 	router.HandleFunc("/api/crypto-params", encryption.GetCryptoParams).Methods("GET")
 
@@ -133,7 +137,7 @@ func CreateNewRouter() *mux.Router {
 	router.HandleFunc("/api/register", authHandler.Register).Methods("POST")
 	router.HandleFunc("/api/logout", authHandler.LogOUT).Methods("DELETE")
 
-	//for all users
+	// Маршруты для всех авторизованных пользователей
 	userRouter := router.NewRoute().Subrouter()
 	userRouter.Use(middlewareHandler.CheckAny)
 	userRouter.HandleFunc("/api/fill-profile", userHandler.FillProfile).Methods("POST")
@@ -143,7 +147,7 @@ func CreateNewRouter() *mux.Router {
 	userRouter.HandleFunc("/ws", chatHandler.HandleConnection).Methods("GET")
 	userRouter.HandleFunc("/api/create-chat-room", chatHandler.CreateRoom).Methods("POST")
 
-	//for students
+	// Маршруты только для студентов
 	studentRouter := router.NewRoute().Subrouter()
 	studentRouter.Use(middlewareHandler.CheckStudent)
 	studentRouter.HandleFunc("/api/get-teachers", userHandler.OutAllTeachers).Methods("GET")
@@ -154,7 +158,7 @@ func CreateNewRouter() *mux.Router {
 	studentRouter.HandleFunc("/api/add-rating", userHandler.AddRating).Methods("POST")
 	studentRouter.HandleFunc("/api/cancel-request", userHandler.CancelRequest).Methods("POST")
 
-	//for teachers
+	// Маршруты только для преподавателей
 	teacherRouter := router.NewRoute().Subrouter()
 	teacherRouter.Use(middlewareHandler.CheckTeacher)
 	teacherRouter.HandleFunc("/api/get-students", userHandler.OutAllStudents).Methods("GET")
@@ -165,7 +169,7 @@ func CreateNewRouter() *mux.Router {
 	teacherRouter.HandleFunc("/api/download-solution", taskHandler.DownloadTask).Methods("GET")
 	teacherRouter.HandleFunc("/api/add-grade", taskHandler.AddGrade).Methods("POST")
 
-	//static
+	// Маршруты для статических страниц
 	router.HandleFunc("/", handlers.OutIndex)
 	router.HandleFunc("/register", handlers.OutRegister)
 	router.HandleFunc("/login", handlers.OutLogin)

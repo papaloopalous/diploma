@@ -1,34 +1,36 @@
 package repo
 
 import (
-	"api/internal/messages"
 	"api/internal/proto/sessionpb"
 	"context"
-	"errors"
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
 )
 
+// SessionRepoGRPC реализует взаимодействие с сервисом сессий через gRPC
 type SessionRepoGRPC struct {
-	db sessionpb.SessionServiceClient
+	db sessionpb.SessionServiceClient // gRPC клиент для взаимодействия с сервисом сессий
 }
 
+// Проверка реализации интерфейса SessionRepo
 var _ SessionRepo = &SessionRepoGRPC{}
 
+// NewSessionRepo создает новый экземпляр репозитория сессий
 func NewSessionRepo(conn *grpc.ClientConn) *SessionRepoGRPC {
 	return &SessionRepoGRPC{
 		db: sessionpb.NewSessionServiceClient(conn),
 	}
 }
 
+// GetSession получает информацию о сессии из базы данных
 func (r *SessionRepoGRPC) GetSession(sessionID uuid.UUID) (userID uuid.UUID, role string, err error) {
 	ctx := context.Background()
 	resp, err := r.db.GetSession(ctx, &sessionpb.SessionIDRequest{
 		SessionId: sessionID.String(),
 	})
 	if err != nil {
-		return uuid.Nil, "", errors.New(messages.ErrSessionNotFound)
+		return uuid.Nil, "", err
 	}
 
 	userID, err = uuid.Parse(resp.UserId)
@@ -39,6 +41,7 @@ func (r *SessionRepoGRPC) GetSession(sessionID uuid.UUID) (userID uuid.UUID, rol
 	return userID, resp.Role, nil
 }
 
+// SetSession создает новую сессию в базе данных
 func (r *SessionRepoGRPC) SetSession(sessionID uuid.UUID, userID uuid.UUID, role string) error {
 	ctx := context.Background()
 	_, err := r.db.SetSession(ctx, &sessionpb.SetSessionRequest{
@@ -53,13 +56,14 @@ func (r *SessionRepoGRPC) SetSession(sessionID uuid.UUID, userID uuid.UUID, role
 	return nil
 }
 
+// DeleteSession удаляет сессию из базы данных и возвращает ID пользователя
 func (r *SessionRepoGRPC) DeleteSession(sessionID uuid.UUID) (userID uuid.UUID, err error) {
 	ctx := context.Background()
 	resp, err := r.db.DeleteSession(ctx, &sessionpb.SessionIDRequest{
 		SessionId: sessionID.String(),
 	})
 	if err != nil {
-		return uuid.Nil, errors.New(messages.ErrSessionNotFound)
+		return uuid.Nil, err
 	}
 
 	return uuid.Parse(resp.UserId)

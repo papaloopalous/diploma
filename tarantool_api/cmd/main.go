@@ -4,8 +4,10 @@ import (
 	"context"
 	"log"
 	"net"
+	"os"
 	"tarantool_api/sessionpb"
 
+	"github.com/joho/godotenv"
 	"github.com/tarantool/go-tarantool"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -61,12 +63,23 @@ func (s *server) DeleteSession(ctx context.Context, req *sessionpb.SessionIDRequ
 }
 
 func main() {
-	opts := tarantool.Opts{
-		User: "guest",
-		Pass: "",
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal(".env file not found")
 	}
 
-	db, err := tarantool.Connect("localhost:3301", opts)
+	dbHost := os.Getenv("TARANTOOL_HOST")
+	dbPort := os.Getenv("TARANTOOL_PORT")
+	dbUser := os.Getenv("TARANTOOL_USER")
+	dbPass := os.Getenv("TARANTOOL_PASS")
+	serverPort := os.Getenv("SERVER_PORT")
+
+	opts := tarantool.Opts{
+		User: dbUser,
+		Pass: dbPass,
+	}
+
+	db, err := tarantool.Connect(dbHost+":"+dbPort, opts)
 	if err != nil {
 		log.Fatalf("failed to connect to tarantool: %v", err)
 	}
@@ -78,7 +91,7 @@ func main() {
 		}
 	}()
 
-	lis, err := net.Listen("tcp", ":50053")
+	lis, err := net.Listen("tcp", ":"+serverPort)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
@@ -87,7 +100,7 @@ func main() {
 	sessionpb.RegisterSessionServiceServer(s, &server{db: db})
 	reflection.Register(s)
 
-	log.Printf("server listening at %v", lis.Addr())
+	log.Printf("server running on port %s", serverPort)
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}

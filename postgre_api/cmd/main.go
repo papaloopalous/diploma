@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"postgre_api/chatpb"
 	"postgre_api/taskpb"
 	"postgre_api/userpb"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/google/uuid"
 	pgx "github.com/jackc/pgx/v5"
+	"github.com/joho/godotenv"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -629,9 +631,23 @@ func (s *server) UpdateStatus(ctx context.Context,
 }
 
 func main() {
-	ctx := context.Background()
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal(".env file not found")
+	}
 
-	conn, err := pgx.Connect(ctx, "postgres://user:password@localhost:5432/mydb")
+	dbHost := os.Getenv("POSTGRES_HOST")
+	dbPort := os.Getenv("POSTGRES_PORT")
+	dbUser := os.Getenv("POSTGRES_USER")
+	dbPass := os.Getenv("POSTGRES_PASS")
+	dbName := os.Getenv("POSTGRES_DB")
+	serverPort := os.Getenv("SERVER_PORT")
+
+	connString := fmt.Sprintf("postgres://%s:%s@%s:%s/%s",
+		dbUser, dbPass, dbHost, dbPort, dbName)
+
+	ctx := context.Background()
+	conn, err := pgx.Connect(ctx, connString)
 	if err != nil {
 		log.Fatalf("unable to connect to database: %v\n", err)
 	}
@@ -651,11 +667,11 @@ func main() {
 
 	reflection.Register(grpcServer)
 
-	listener, err := net.Listen("tcp", ":50052")
+	listener, err := net.Listen("tcp", ":"+serverPort)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
-	log.Println("gRPC server is running on port 50052...")
+	log.Printf("server is running on port %s", serverPort)
 	if err := grpcServer.Serve(listener); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}

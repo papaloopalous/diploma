@@ -11,45 +11,73 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/spf13/viper"
 )
 
+var sessionLifetime = time.Duration(coef) * time.Minute
+
+// coef - коэффициент времени жизни сессии (в минутах)
+var coef int
+
+// AuthHandler обрабатывает запросы аутентификации
 type AuthHandler struct {
-	User    repo.UserRepo
-	Token   repo.TokenRepo
-	Session repo.SessionRepo
-	secret  string
+	User    repo.UserRepo    // Репозиторий пользователей
+	Token   repo.TokenRepo   // Репозиторий токенов
+	Session repo.SessionRepo // Репозиторий сессий
+	secret  string           // Секретный ключ для шифрования
 }
 
-var serverSecretKey []byte = []byte("863d268fe1fbedad03c347670de5580d4c44486228c0bb8108840e08b6aea204")
+var serverSecretKey []byte
 
+func init() {
+	serverSecretKey = []byte(viper.GetString("crypto.serverSecretKey"))
+	coef = viper.GetInt("session.lifetime")
+}
+
+// EncryptionKey обменивается ключами для установки защищенного соединения
 func (p *AuthHandler) EncryptionKey(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		ClientPublic string `json:"clientPublic"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		response.WriteAPIResponse(w, http.StatusBadRequest, false, "Invalid request", nil)
+		loggergrpc.LC.LogError(messages.ServiceAuth, messages.LogErrParamsRequest, map[string]string{
+			messages.LogDetails: err.Error(),
+		})
+		response.WriteAPIResponse(w, http.StatusBadRequest, false, messages.ClientErrBadRequest, nil)
 		return
 	}
 
 	secret, err := encryption.DeriveSharedKeyHex(req.ClientPublic)
 	if err != nil {
-		response.WriteAPIResponse(w, http.StatusBadRequest, false, "Invalid public key", nil)
+		loggergrpc.LC.LogError(messages.ServiceAuth, messages.LogErrKeyDerivation, map[string]string{
+			messages.LogDetails: err.Error(),
+			"client_pub":        req.ClientPublic,
+		})
+		response.WriteAPIResponse(w, http.StatusBadRequest, false, messages.ClientErrInvalidPublicKey, nil)
 		return
 	}
 
 	p.secret = secret
 
-	response.WriteAPIResponse(w, http.StatusOK, true, "", map[string]string{
-		"serverPublic": encryption.GetServerPublicKey(),
+	serverPublic := encryption.GetServerPublicKey()
+	loggergrpc.LC.LogInfo(messages.ServiceAuth, messages.LogStatusParamsSent, map[string]string{
+		"server_pub": serverPublic,
+	})
+
+	response.WriteAPIResponse(w, http.StatusOK, true, messages.StatusSuccess, map[string]string{
+		"serverPublic": serverPublic,
 	})
 }
 
+// LogIN аутентифицирует пользователя
 func (p *AuthHandler) LogIN(w http.ResponseWriter, r *http.Request) {
 	var requestData map[string]string
 	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
-		response.WriteAPIResponse(w, http.StatusBadRequest, false, messages.ErrBadRequest, nil)
-		loggergrpc.LC.LogError(messages.ServiceAuth, messages.ErrDecodeRequest, map[string]string{messages.LogDetails: err.Error()})
+		loggergrpc.LC.LogError(messages.ServiceAuth, messages.LogErrParamsRequest, map[string]string{
+			messages.LogDetails: err.Error(),
+		})
+		response.WriteAPIResponse(w, http.StatusBadRequest, false, messages.ClientErrBadRequest, nil)
 		return
 	}
 
@@ -60,75 +88,80 @@ func (p *AuthHandler) LogIN(w http.ResponseWriter, r *http.Request) {
 
 	username, err := encryption.DecryptData(encryptedUsername, key)
 	if err != nil {
-		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ErrDecryption, nil)
-		loggergrpc.LC.LogError(messages.ServiceAuth, messages.ErrDecrypt, map[string]string{messages.LogDetails: err.Error()})
+		loggergrpc.LC.LogError(messages.ServiceAuth, messages.LogErrDecryption, map[string]string{
+			messages.LogDetails: err.Error(),
+		})
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ClientErrDecryption, nil)
 		return
 	}
 
 	password, err := encryption.DecryptData(encryptedPassword, key)
 	if err != nil {
-		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ErrDecryption, nil)
-		loggergrpc.LC.LogError(messages.ServiceAuth, messages.ErrDecrypt, map[string]string{messages.LogDetails: err.Error()})
+		loggergrpc.LC.LogError(messages.ServiceAuth, messages.LogErrDecryption, map[string]string{
+			messages.LogDetails: err.Error(),
+		})
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ClientErrDecryption, nil)
 		return
 	}
 
 	newPassword, err := encryption.EncryptData(password, string(serverSecretKey))
 	if err != nil {
-		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ErrEncryption, nil)
-		loggergrpc.LC.LogError(messages.ServiceAuth, messages.ErrEncryption, map[string]string{messages.LogDetails: err.Error()})
+		loggergrpc.LC.LogError(messages.ServiceAuth, messages.LogErrEncryption, map[string]string{
+			messages.LogDetails: err.Error(),
+		})
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ClientErrEncryption, nil)
 		return
 	}
 
 	userID, userRole, err := p.User.CheckPass(username, newPassword)
 	if err != nil {
-		response.WriteAPIResponse(w, http.StatusUnauthorized, false, err.Error(), nil)
-		loggergrpc.LC.LogInfo(messages.ServiceAuth, messages.ErrAuth, map[string]string{messages.LogDetails: err.Error()})
+		loggergrpc.LC.LogError(messages.ServiceAuth, messages.LogErrAuthFailed, map[string]string{
+			messages.LogDetails: err.Error(),
+			"username":          username,
+		})
+		response.WriteAPIResponse(w, http.StatusUnauthorized, false, messages.ClientErrAuth, nil)
 		return
 	}
 
 	sessionID := uuid.New()
-
 	token, err := p.Token.GenerateJWT(sessionID)
 	if err != nil {
-		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ErrSessionSet, nil)
-		loggergrpc.LC.LogError(messages.ServiceAuth, messages.ErrGenToken, map[string]string{messages.LogDetails: err.Error()})
+		loggergrpc.LC.LogError(messages.ServiceAuth, messages.LogErrSessionInvalid, map[string]string{
+			messages.LogSessionID: sessionID.String(),
+			messages.LogDetails:   err.Error(),
+		})
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ClientErrSessionExpired, nil)
 		return
 	}
 
 	err = p.Session.SetSession(sessionID, userID, userRole)
 	if err != nil {
-		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ErrSessionSet, nil)
-		loggergrpc.LC.LogError(messages.ServiceAuth, messages.ErrSessionSet, map[string]string{messages.LogDetails: err.Error()})
+		loggergrpc.LC.LogError(messages.ServiceAuth, messages.LogErrSessionInvalid, map[string]string{
+			messages.LogSessionID: sessionID.String(),
+			messages.LogDetails:   err.Error(),
+		})
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ClientErrSessionExpired, nil)
 		return
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     messages.CookieAuthToken,
-		Value:    token,
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-		Path:     "/",
-		Expires:  time.Now().Add(10 * time.Minute),
-	})
+	setCookie(w, messages.CookieAuthToken, token, true)
+	setCookie(w, messages.CookieUserRole, userRole, false)
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     messages.CookieUserRole,
-		Value:    userRole,
-		HttpOnly: false,
-		SameSite: http.SameSiteLaxMode,
-		Path:     "/",
-		Expires:  time.Now().Add(10 * time.Minute),
+	loggergrpc.LC.LogInfo(messages.ServiceAuth, messages.LogStatusUserAuth, map[string]string{
+		messages.LogUserID:   userID.String(),
+		messages.LogUserRole: userRole,
 	})
-
 	response.WriteAPIResponse(w, http.StatusOK, true, messages.StatusAuth, nil)
-	loggergrpc.LC.LogInfo(messages.ServiceAuth, messages.StatusUserAuth, map[string]string{messages.LogUserID: userID.String()})
 }
 
+// Register регистрирует нового пользователя
 func (p *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	var requestData map[string]string
 	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
-		response.WriteAPIResponse(w, http.StatusBadRequest, false, messages.ErrBadRequest, nil)
-		loggergrpc.LC.LogError(messages.ServiceAuth, messages.ErrDecodeRequest, map[string]string{messages.LogDetails: err.Error()})
+		loggergrpc.LC.LogError(messages.ServiceAuth, messages.LogErrParamsRequest, map[string]string{
+			messages.LogDetails: err.Error(),
+		})
+		response.WriteAPIResponse(w, http.StatusBadRequest, false, messages.ClientErrBadRequest, nil)
 		return
 	}
 
@@ -140,29 +173,38 @@ func (p *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 	username, err := encryption.DecryptData(encryptedUsername, key)
 	if err != nil {
-		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ErrDecryption, nil)
-		loggergrpc.LC.LogError(messages.ServiceAuth, messages.ErrDecrypt, map[string]string{messages.LogDetails: err.Error()})
+		loggergrpc.LC.LogError(messages.ServiceAuth, messages.LogErrDecryption, map[string]string{
+			messages.LogDetails: err.Error(),
+		})
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ClientErrDecryption, nil)
 		return
 	}
 
 	password, err := encryption.DecryptData(encryptedPassword, key)
 	if err != nil {
-		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ErrDecryption, nil)
-		loggergrpc.LC.LogError(messages.ServiceAuth, messages.ErrDecrypt, map[string]string{messages.LogDetails: err.Error()})
+		loggergrpc.LC.LogError(messages.ServiceAuth, messages.LogErrDecryption, map[string]string{
+			messages.LogDetails: err.Error(),
+		})
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ClientErrDecryption, nil)
 		return
 	}
 
 	newPassword, err := encryption.EncryptData(password, string(serverSecretKey))
 	if err != nil {
-		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ErrEncryption, nil)
-		loggergrpc.LC.LogError(messages.ServiceAuth, messages.ErrEncryption, map[string]string{messages.LogDetails: err.Error()})
+		loggergrpc.LC.LogError(messages.ServiceAuth, messages.LogErrEncryption, map[string]string{
+			messages.LogDetails: err.Error(),
+		})
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ClientErrEncryption, nil)
 		return
 	}
 
 	userID, err := p.User.CreateAccount(username, newPassword, role)
 	if err != nil {
-		response.WriteAPIResponse(w, http.StatusBadRequest, false, err.Error(), nil)
-		loggergrpc.LC.LogInfo(messages.ServiceAuth, messages.ErrCeateAcc, map[string]string{messages.LogDetails: err.Error()})
+		loggergrpc.LC.LogError(messages.ServiceAuth, messages.LogErrDBQuery, map[string]string{
+			messages.LogDetails: err.Error(),
+			"username":          username,
+		})
+		response.WriteAPIResponse(w, http.StatusBadRequest, false, messages.ClientErrUserNotFound, nil)
 		return
 	}
 
@@ -170,77 +212,89 @@ func (p *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 	token, err := p.Token.GenerateJWT(sessionID)
 	if err != nil {
-		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ErrSessionSet, nil)
-		loggergrpc.LC.LogError(messages.ServiceAuth, messages.ErrGenToken, map[string]string{messages.LogDetails: err.Error()})
+		loggergrpc.LC.LogError(messages.ServiceAuth, messages.LogErrTokenGeneration, map[string]string{
+			messages.LogSessionID: sessionID.String(),
+			messages.LogDetails:   err.Error(),
+		})
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ClientErrSessionExpired, nil)
 		return
 	}
 
 	err = p.Session.SetSession(sessionID, userID, role)
 	if err != nil {
-		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ErrSessionSet, nil)
-		loggergrpc.LC.LogError(messages.ServiceAuth, messages.ErrSessionSet, map[string]string{messages.LogDetails: err.Error()})
+		loggergrpc.LC.LogError(messages.ServiceAuth, messages.LogErrSessionInvalid, map[string]string{
+			messages.LogSessionID: sessionID.String(),
+			messages.LogDetails:   err.Error(),
+		})
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ClientErrSessionExpired, nil)
 		return
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     messages.CookieAuthToken,
-		Value:    token,
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-		Path:     "/",
-		Expires:  time.Now().Add(10 * time.Minute),
-	})
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     messages.CookieUserRole,
-		Value:    role,
-		HttpOnly: false,
-		SameSite: http.SameSiteLaxMode,
-		Path:     "/",
-		Expires:  time.Now().Add(10 * time.Minute),
-	})
+	setCookie(w, messages.CookieAuthToken, token, true)
+	setCookie(w, messages.CookieUserRole, role, false)
 
 	response.WriteAPIResponse(w, http.StatusOK, true, messages.StatusAuth, nil)
-	loggergrpc.LC.LogInfo(messages.ServiceAuth, messages.StatusUserAuth, map[string]string{messages.LogUserID: userID.String()})
+	loggergrpc.LC.LogInfo(messages.ServiceAuth, messages.LogStatusUserAuth, map[string]string{messages.LogUserID: userID.String()})
 }
 
+// LogOUT завершает сессию пользователя
 func (p *AuthHandler) LogOUT(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie(messages.CookieAuthToken)
 	if err != nil {
-		response.WriteAPIResponse(w, http.StatusBadRequest, false, messages.ErrNoToken, nil)
+		loggergrpc.LC.LogError(messages.ServiceAuth, messages.LogErrSessionInvalid, map[string]string{
+			messages.LogDetails: err.Error(),
+		})
+		response.WriteAPIResponse(w, http.StatusBadRequest, false, messages.ClientErrSessionExpired, nil)
 		return
 	}
 
 	token, err := p.Token.ParseJWT(cookie.Value)
 	if err != nil {
-		response.WriteAPIResponse(w, http.StatusBadRequest, false, messages.ErrBadToken, nil)
-		loggergrpc.LC.LogError(messages.ServiceAuth, messages.ErrParseToken, map[string]string{messages.LogDetails: err.Error()})
+		loggergrpc.LC.LogError(messages.ServiceAuth, messages.LogErrSessionInvalid, map[string]string{
+			messages.LogSessionID: token.SessionID.String(),
+			messages.LogDetails:   err.Error(),
+		})
+		response.WriteAPIResponse(w, http.StatusBadRequest, false, messages.ClientErrSessionExpired, nil)
 		return
 	}
 
 	userID, err := p.Session.DeleteSession(token.SessionID)
 	if err != nil {
-		response.WriteAPIResponse(w, http.StatusNotFound, false, err.Error(), nil)
-		loggergrpc.LC.LogError(messages.ServiceAuth, err.Error(), map[string]string{
+		loggergrpc.LC.LogError(messages.ServiceAuth, messages.LogErrSessionDelete, map[string]string{
 			messages.LogSessionID: token.SessionID.String(),
+			messages.LogDetails:   err.Error(),
 		})
+		response.WriteAPIResponse(w, http.StatusNotFound, false, messages.ClientErrSessionExpired, nil)
 		return
 	}
 
-	clearCookie := func(name string) {
-		http.SetCookie(w, &http.Cookie{
-			Name:     name,
-			Value:    "",
-			HttpOnly: name == messages.CookieAuthToken,
-			MaxAge:   -1,
-			SameSite: http.SameSiteLaxMode,
-			Path:     "/",
-		})
-	}
-
-	clearCookie(messages.CookieAuthToken)
-	clearCookie(messages.CookieUserRole)
+	clearCookie(w, messages.CookieAuthToken)
+	clearCookie(w, messages.CookieUserRole)
 
 	response.WriteAPIResponse(w, http.StatusOK, true, messages.StatusLogOut, nil)
-	loggergrpc.LC.LogInfo(messages.ServiceAuth, messages.StatusUserLogOut, map[string]string{messages.LogUserID: userID.String()})
+	loggergrpc.LC.LogInfo(messages.ServiceAuth, messages.LogStatusUserLogOut, map[string]string{messages.LogUserID: userID.String()})
+}
+
+// setCookie устанавливает cookie с заданными параметрами
+func setCookie(w http.ResponseWriter, name, value string, httpOnly bool) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     name,
+		Value:    value,
+		HttpOnly: httpOnly,
+		SameSite: http.SameSiteLaxMode,
+		Path:     "/",
+		Expires:  time.Now().Add(sessionLifetime),
+	})
+}
+
+// clearCookie удаляет cookie
+func clearCookie(w http.ResponseWriter, name string) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     name,
+		Value:    "",
+		HttpOnly: name == messages.CookieAuthToken,
+		MaxAge:   -1,
+		SameSite: http.SameSiteLaxMode,
+		Path:     "/",
+	})
 }

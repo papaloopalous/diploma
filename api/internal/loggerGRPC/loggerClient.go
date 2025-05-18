@@ -35,6 +35,7 @@ func (lc *LogClient) Log(level, service, message string, metadata map[string]str
 
 	if err != nil {
 		log.Printf("error sending a log (level=%s): %v", level, err)
+		log.Println(service, message, metadata)
 	}
 }
 

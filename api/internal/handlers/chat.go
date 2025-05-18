@@ -17,51 +17,56 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// ChatHandler обрабатывает запросы чата
 type ChatHandler struct {
-	User repo.UserRepo
-	Chat repo.ChatRepo
+	User repo.UserRepo // Репозиторий пользователей
+	Chat repo.ChatRepo // Репозиторий сообщений чата
 }
 
+// Client представляет подключенного пользователя
 type Client struct {
-	conn     *websocket.Conn
-	userID   uuid.UUID
-	isActive bool
+	conn     *websocket.Conn // WebSocket соединение
+	userID   uuid.UUID       // Идентификатор пользователя
+	isActive bool            // Статус подключения
 }
 
+// Room представляет комнату чата
 type Room struct {
-	clients     []*Client
-	clientsLock sync.Mutex
-	user1ID     uuid.UUID
-	user2ID     uuid.UUID
+	clients     []*Client  // Подключенные клиенты
+	clientsLock sync.Mutex // Мьютекс для безопасного доступа к клиентам
+	user1ID     uuid.UUID  // Идентификатор первого пользователя
+	user2ID     uuid.UUID  // Идентификатор второго пользователя
 }
 
+// Глобальные переменные для работы с WebSocket
 var (
 	upgrader = websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
-	rooms    = make(map[string]*Room)
-	roomsMu  sync.Mutex
+	rooms    = make(map[string]*Room) // Карта активных комнат
+	roomsMu  sync.Mutex               // Мьютекс для безопасного доступа к комнатам
 )
 
+// wsMessage представляет структуру сообщения WebSocket
 type wsMessage struct {
-	ID       string    `json:"id"`
-	Type     string    `json:"type"`
-	RoomID   string    `json:"roomId"`
-	SenderID uuid.UUID `json:"senderId"`
-	Text     string    `json:"text"`
-	SentAt   time.Time `json:"sentAt"`
-	IsSender bool      `json:"isSender"`
-	Status   string    `json:"status"`
+	ID       string    `json:"id"`       // Идентификатор сообщения
+	Type     string    `json:"type"`     // Тип сообщения
+	RoomID   string    `json:"roomId"`   // Идентификатор комнаты
+	SenderID uuid.UUID `json:"senderId"` // Идентификатор отправителя
+	Text     string    `json:"text"`     // Текст сообщения
+	SentAt   time.Time `json:"sentAt"`   // Время отправки
+	IsSender bool      `json:"isSender"` // Признак отправителя
+	Status   string    `json:"status"`   // Статус сообщения
 }
 
 func enumToClient(s chatpb.MessageStatus) string {
 	switch s {
 	case chatpb.MessageStatus_SENT:
-		return "sent"
+		return messages.ChatStatusSent
 	case chatpb.MessageStatus_DELIVERED:
-		return "delivered"
+		return messages.ChatStatusDelivered
 	case chatpb.MessageStatus_READ:
-		return "read"
+		return messages.ChatStatusRead
 	default:
-		return "sent"
+		return messages.ChatStatusSent
 	}
 }
 
@@ -69,34 +74,41 @@ type createRoomRequest struct {
 	OtherUserID string `json:"otherUserId"`
 }
 
+// CreateRoom создает новую комнату для чата между двумя пользователями
 func (h *ChatHandler) CreateRoom(w http.ResponseWriter, r *http.Request) {
 	var req createRoomRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		response.WriteAPIResponse(w, http.StatusBadRequest, false, messages.ErrDecodeRequest, nil)
-		loggergrpc.LC.LogError(messages.ServiceChat, messages.ErrDecodeRequest, map[string]string{messages.LogDetails: err.Error()})
+		loggergrpc.LC.LogError(messages.ServiceChat, messages.LogErrDecodeRequest, map[string]string{
+			messages.LogDetails: err.Error(),
+		})
+		response.WriteAPIResponse(w, http.StatusBadRequest, false, messages.ClientErrBadRequest, nil)
 		return
 	}
 
 	userID := middleware.GetContext(r.Context())
 	otherID, err := uuid.Parse(req.OtherUserID)
 	if err != nil || userID == uuid.Nil {
-		response.WriteAPIResponse(w, http.StatusBadRequest, false, messages.ErrBadUserID, nil)
+		response.WriteAPIResponse(w, http.StatusBadRequest, false, messages.ClientErrBadID, nil)
 		return
 	}
 
 	if _, err = h.User.FindUser(userID); err != nil {
-		response.WriteAPIResponse(w, http.StatusNotFound, false, messages.ErrUserNotFound, nil)
+		response.WriteAPIResponse(w, http.StatusNotFound, false, messages.ClientErrUserNotFound, nil)
 		return
 	}
 	if _, err = h.User.FindUser(otherID); err != nil {
-		response.WriteAPIResponse(w, http.StatusNotFound, false, messages.ErrUserNotFound, nil)
+		response.WriteAPIResponse(w, http.StatusNotFound, false, messages.ClientErrUserNotFound, nil)
 		return
 	}
 
 	roomID, existed, err := h.Chat.CreateRoom(userID, otherID)
 	if err != nil {
-		response.WriteAPIResponse(w, http.StatusInternalServerError, false, err.Error(), nil)
-		loggergrpc.LC.LogError(messages.ServiceChat, err.Error(), nil)
+		loggergrpc.LC.LogError(messages.ServiceChat, messages.LogErrChatRoomCreate, map[string]string{
+			messages.LogDetails: err.Error(),
+			messages.LogUserID:  userID.String(),
+			messages.LogOtherID: otherID.String(),
+		})
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ClientErrChatConnect, nil)
 		return
 	}
 
@@ -107,43 +119,52 @@ func (h *ChatHandler) CreateRoom(w http.ResponseWriter, r *http.Request) {
 		msg = messages.StatusRoomExists
 	}
 
-	response.WriteAPIResponse(w, code, true, msg, map[string]string{"roomId": roomID})
-	loggergrpc.LC.LogInfo(messages.ServiceChat, msg, map[string]string{
-		messages.LogRoomID: roomID,
-		messages.LogUserID: userID.String(), messages.LogOtherID: otherID.String(),
+	response.WriteAPIResponse(w, code, true, msg, map[string]string{messages.LogRoomID: roomID})
+	loggergrpc.LC.LogInfo(messages.ServiceChat, messages.LogStatusChatRoomCreated, map[string]string{
+		messages.LogRoomID:  roomID,
+		messages.LogUserID:  userID.String(),
+		messages.LogOtherID: otherID.String(),
 	})
 }
 
+// HandleConnection обрабатывает входящее WebSocket-соединение
 func (h *ChatHandler) HandleConnection(w http.ResponseWriter, r *http.Request) {
-	roomID := r.URL.Query().Get("room")
+	roomID := r.URL.Query().Get(messages.ReqRoom)
 	if roomID == "" {
-		response.WriteAPIResponse(w, http.StatusBadRequest, false, messages.ErrNoRoomID, nil)
+		loggergrpc.LC.LogError(messages.ServiceChat, messages.LogErrNoRoomID, nil)
+		response.WriteAPIResponse(w, http.StatusBadRequest, false, messages.ClientErrNoRoomID, nil)
 		return
 	}
 
 	currentUserID := middleware.GetContext(r.Context())
 	if currentUserID == uuid.Nil {
-		response.WriteAPIResponse(w, http.StatusUnauthorized, false, messages.ErrBadUserID, nil)
+		response.WriteAPIResponse(w, http.StatusUnauthorized, false, messages.ClientErrBadID, nil)
 		return
 	}
 
 	history, err := h.Chat.History(roomID)
 	if err != nil {
-		response.WriteAPIResponse(w, http.StatusForbidden, false, messages.ErrNoRoomAccess, nil)
+		response.WriteAPIResponse(w, http.StatusForbidden, false, messages.ClientErrNoRoomAccess, nil)
 		return
 	}
 
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		loggergrpc.LC.LogError(messages.ServiceChat, messages.ErrUpgradeConn,
-			map[string]string{messages.LogDetails: err.Error()})
+		loggergrpc.LC.LogError(messages.ServiceChat, messages.LogErrUpgradeConn, map[string]string{
+			messages.LogDetails: err.Error(),
+			messages.LogRoomID:  roomID,
+		})
 		return
 	}
 	defer conn.Close()
 
+	// Создание или получение комнаты
 	roomsMu.Lock()
 	room := rooms[roomID]
 	if room == nil {
+		loggergrpc.LC.LogInfo(messages.ServiceChat, messages.LogStatusRoomCreating, map[string]string{
+			messages.LogRoomID: roomID,
+		})
 		var u1, u2 uuid.UUID
 		if len(history) != 0 {
 			u1 = history[0].SenderID
@@ -159,9 +180,14 @@ func (h *ChatHandler) HandleConnection(w http.ResponseWriter, r *http.Request) {
 	}
 	roomsMu.Unlock()
 
+	// Добавление клиента в комнату
 	room.clientsLock.Lock()
 	for i, c := range room.clients {
 		if c.userID == currentUserID {
+			loggergrpc.LC.LogInfo(messages.ServiceChat, messages.LogStatusUserReconnected, map[string]string{
+				messages.LogRoomID: roomID,
+				messages.LogUserID: currentUserID.String(),
+			})
 			room.clients = append(room.clients[:i], room.clients[i+1:]...)
 			break
 		}
@@ -170,12 +196,19 @@ func (h *ChatHandler) HandleConnection(w http.ResponseWriter, r *http.Request) {
 	room.clients = append(room.clients, client)
 	room.clientsLock.Unlock()
 
-	loggergrpc.LC.LogInfo(messages.ServiceChat, messages.StatusUserConnected,
-		map[string]string{messages.LogRoomID: roomID, messages.LogUserID: currentUserID.String()})
+	loggergrpc.LC.LogInfo(messages.ServiceChat, messages.StatusUserConnected, map[string]string{
+		messages.LogRoomID: roomID,
+		messages.LogUserID: currentUserID.String(),
+	})
 
+	// Обработка истории сообщений
 	for i, m := range history {
 		if m.Status == chatpb.MessageStatus_SENT && m.SenderID != currentUserID {
-			// в БД
+			loggergrpc.LC.LogInfo(messages.ServiceChat, messages.LogStatusMessageDelivered, map[string]string{
+				messages.LogRoomID:    roomID,
+				messages.LogUserID:    currentUserID.String(),
+				messages.LogMessageID: m.ID.String(),
+			})
 			_ = h.Chat.UpdateStatus(m.ID, chatpb.MessageStatus_DELIVERED)
 			history[i].Status = chatpb.MessageStatus_DELIVERED
 
@@ -184,8 +217,8 @@ func (h *ChatHandler) HandleConnection(w http.ResponseWriter, r *http.Request) {
 				if c.userID == m.SenderID && c.isActive {
 					_ = c.conn.WriteJSON(wsMessage{
 						ID:     m.ID.String(),
-						Type:   "status",
-						Status: "delivered",
+						Type:   messages.ChatTypeStatus,
+						Status: messages.ChatStatusDelivered,
 					})
 					break
 				}
@@ -197,7 +230,7 @@ func (h *ChatHandler) HandleConnection(w http.ResponseWriter, r *http.Request) {
 	for _, m := range history {
 		_ = conn.WriteJSON(wsMessage{
 			ID:       m.ID.String(),
-			Type:     "message",
+			Type:     messages.ChatTypeMessage,
 			RoomID:   roomID,
 			SenderID: m.SenderID,
 			Text:     m.Text,
@@ -207,17 +240,22 @@ func (h *ChatHandler) HandleConnection(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	// Основной цикл обработки сообщений
 	for {
 		var incoming wsMessage
 		if err := conn.ReadJSON(&incoming); err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
-				loggergrpc.LC.LogError(messages.ServiceChat, err.Error(), nil)
+				loggergrpc.LC.LogError(messages.ServiceChat, messages.LogErrWSRead, map[string]string{
+					messages.LogDetails: err.Error(),
+					messages.LogRoomID:  roomID,
+					messages.LogUserID:  currentUserID.String(),
+				})
 			}
 			client.isActive = false
 			break
 		}
 
-		if incoming.Type != "message" {
+		if incoming.Type != messages.ChatTypeMessage {
 			continue
 		}
 
@@ -231,21 +269,32 @@ func (h *ChatHandler) HandleConnection(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err := h.Chat.SaveMessage(newMsg); err != nil {
-			loggergrpc.LC.LogError(messages.ServiceChat, err.Error(), nil)
+			loggergrpc.LC.LogError(messages.ServiceChat, messages.LogErrSaveMessage, map[string]string{
+				messages.LogDetails: err.Error(),
+				messages.LogRoomID:  roomID,
+				messages.LogUserID:  currentUserID.String(),
+			})
 			continue
 		}
 
 		_ = conn.WriteJSON(wsMessage{
 			ID:       newMsg.ID.String(),
-			Type:     "message",
+			Type:     messages.ChatTypeMessage,
 			RoomID:   roomID,
 			SenderID: currentUserID,
 			Text:     newMsg.Text,
 			SentAt:   newMsg.SentAt,
 			IsSender: true,
-			Status:   "sent",
+			Status:   messages.ChatStatusSent,
 		})
 
+		loggergrpc.LC.LogInfo(messages.ServiceChat, messages.LogStatusMessageSent, map[string]string{
+			messages.LogRoomID:    roomID,
+			messages.LogUserID:    currentUserID.String(),
+			messages.LogMessageID: newMsg.ID.String(),
+		})
+
+		// Отправка сообщения другим клиентам
 		room.clientsLock.Lock()
 		for _, c := range room.clients {
 			if c.userID == currentUserID || !c.isActive {
@@ -253,29 +302,41 @@ func (h *ChatHandler) HandleConnection(w http.ResponseWriter, r *http.Request) {
 			}
 			if err := c.conn.WriteJSON(wsMessage{
 				ID:       newMsg.ID.String(),
-				Type:     "message",
+				Type:     messages.ChatTypeMessage,
 				RoomID:   roomID,
 				SenderID: currentUserID,
 				Text:     newMsg.Text,
 				SentAt:   newMsg.SentAt,
 				IsSender: false,
-				Status:   "sent",
+				Status:   messages.ChatStatusSent,
 			}); err == nil {
-				_ = h.Chat.UpdateStatus(newMsg.ID, chatpb.MessageStatus_DELIVERED)
-				_ = conn.WriteJSON(wsMessage{
-					ID:     newMsg.ID.String(),
-					Type:   "status",
-					Status: "delivered",
+				loggergrpc.LC.LogInfo(messages.ServiceChat, messages.LogStatusMessageDelivered, map[string]string{
+					messages.LogRoomID:     roomID,
+					messages.LogUserID:     currentUserID.String(),
+					messages.LogReceiverID: c.userID.String(),
+					messages.LogMessageID:  newMsg.ID.String(),
+				})
+			} else {
+				loggergrpc.LC.LogError(messages.ServiceChat, messages.LogErrWSSend, map[string]string{
+					messages.LogDetails:    err.Error(),
+					messages.LogRoomID:     roomID,
+					messages.LogUserID:     currentUserID.String(),
+					messages.LogReceiverID: c.userID.String(),
 				})
 			}
 		}
 		room.clientsLock.Unlock()
 	}
 
+	// Удаление клиента при отключении
 	room.clientsLock.Lock()
 	for i, c := range room.clients {
 		if c == client {
 			room.clients = append(room.clients[:i], room.clients[i+1:]...)
+			loggergrpc.LC.LogInfo(messages.ServiceChat, messages.LogStatusUserDisconnected, map[string]string{
+				messages.LogRoomID: roomID,
+				messages.LogUserID: currentUserID.String(),
+			})
 			break
 		}
 	}

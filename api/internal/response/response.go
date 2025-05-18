@@ -6,13 +6,16 @@ import (
 	"net/http"
 )
 
+// APIResponse определяет структуру ответа API
 type APIResponse struct {
-	Success bool        `json:"success"`
-	Code    int         `json:"code"`
-	Message string      `json:"message"`
-	Data    interface{} `json:"data,omitempty"`
+	Success bool        `json:"success"`        // Флаг успешности операции
+	Code    int         `json:"code"`           // HTTP код ответа
+	Message string      `json:"message"`        // Сообщение для пользователя
+	Data    interface{} `json:"data,omitempty"` // Данные ответа (опционально)
 }
 
+// WriteAPIResponse формирует и отправляет JSON-ответ клиенту
+// Устанавливает заголовки ответа, сериализует данные и логирует ошибки при неудаче
 func WriteAPIResponse(w http.ResponseWriter, statusCode int, success bool, message string, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
