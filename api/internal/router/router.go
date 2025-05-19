@@ -10,6 +10,9 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -21,7 +24,8 @@ import (
 // tokenRepo хранит глобальный репозиторий для работы с JWT токенами
 var tokenRepo = repo.NewTokenRepo()
 
-var coef int // коэффициент для таймаута соединения с микросервисами
+var coef1 int // коэффициент для таймаута соединения с микросервисами
+var coef2 int // коэффициент для частоты проверки состояния соединений
 
 // Адреса микросервисов
 var userAddr, chatAddr, sessionAddr, taskAddr, loggerAddr string
@@ -29,7 +33,8 @@ var userAddr, chatAddr, sessionAddr, taskAddr, loggerAddr string
 // init инициализирует секретный ключ для JWT токенов
 func init() {
 	tokenRepo.SetData("secret jwt key")
-	coef = viper.GetInt("api.timeout")
+	coef1 = viper.GetInt("api.timeout")
+	coef2 = viper.GetInt("api.healthcheckInterval")
 	userAddr = viper.GetString("user.addr")
 	chatAddr = viper.GetString("chat.addr")
 	sessionAddr = viper.GetString("session.addr")
@@ -37,11 +42,18 @@ func init() {
 	loggerAddr = viper.GetString("logger.addr")
 }
 
+func gracefulStop(healthcheck *healthcheck.GrpcHealthChecker) {
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	healthcheck.Stop()
+}
+
 // CreateNewRouter создает и настраивает роутер приложения
 // Устанавливает соединения с микросервисами, инициализирует обработчики и настраивает маршруты
 func CreateNewRouter() *mux.Router {
 	// Создаем контекст с таймаутом для установки соединений
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(coef)*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(coef1)*time.Second)
 	defer cancel()
 
 	// Устанавливаем соединения с микросервисами
@@ -49,7 +61,6 @@ func CreateNewRouter() *mux.Router {
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock())
 	if err != nil {
-		log.Println(userAddr)
 		log.Fatalf("failed to connect to user service: %v", err)
 	}
 
@@ -82,7 +93,11 @@ func CreateNewRouter() *mux.Router {
 	}
 
 	// Инициализируем проверку здоровья сервисов
-	healthChecker := healthcheck.NewHealthChecker(5 * time.Second)
+	healthChecker := healthcheck.NewHealthChecker(time.Duration(coef2) * time.Second)
+
+	go gracefulStop(healthChecker)
+
+	// Добавляем соединения в проверку состояния
 	healthChecker.AddConnection("user-service", userConn)
 	healthChecker.AddConnection("task-service", taskConn)
 	healthChecker.AddConnection("chat-service", chatConn)

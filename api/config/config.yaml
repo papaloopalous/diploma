@@ -1,6 +1,7 @@
 api:
   port: ":8080"
   timeout: 5
+  healthcheckInterval: 5
 
 crypto:
   prime: "FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD1"
