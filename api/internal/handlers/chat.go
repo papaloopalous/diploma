@@ -196,7 +196,7 @@ func (h *ChatHandler) HandleConnection(w http.ResponseWriter, r *http.Request) {
 	room.clients = append(room.clients, client)
 	room.clientsLock.Unlock()
 
-	loggergrpc.LC.LogInfo(messages.ServiceChat, messages.StatusUserConnected, map[string]string{
+	loggergrpc.LC.LogInfo(messages.ServiceChat, messages.LogStatusUserConnected, map[string]string{
 		messages.LogRoomID: roomID,
 		messages.LogUserID: currentUserID.String(),
 	})

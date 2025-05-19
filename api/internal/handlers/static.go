@@ -12,7 +12,7 @@ import (
 func serveHTML(w http.ResponseWriter, r *http.Request, filename string) {
 	tmpl, err := template.ParseFiles("assets/html/" + filename)
 	if err != nil {
-		loggergrpc.LC.LogError(messages.ServiceEncryption, messages.LogErrLoadTemplate, map[string]string{
+		loggergrpc.LC.LogError(messages.ServiceStatic, messages.LogErrLoadTemplate, map[string]string{
 			messages.LogDetails:  err.Error(),
 			messages.LogReqPath:  r.URL.Path,
 			messages.LogFilename: filename,
@@ -23,7 +23,7 @@ func serveHTML(w http.ResponseWriter, r *http.Request, filename string) {
 
 	err = tmpl.Execute(w, nil)
 	if err != nil {
-		loggergrpc.LC.LogError(messages.ServiceEncryption, messages.LogErrRenderTemplate, map[string]string{
+		loggergrpc.LC.LogError(messages.ServiceStatic, messages.LogErrRenderTemplate, map[string]string{
 			messages.LogDetails:  err.Error(),
 			messages.LogReqPath:  r.URL.Path,
 			messages.LogFilename: filename,
@@ -32,7 +32,7 @@ func serveHTML(w http.ResponseWriter, r *http.Request, filename string) {
 		return
 	}
 
-	loggergrpc.LC.LogInfo(messages.ServiceEncryption, messages.LogStatusPageServed, map[string]string{
+	loggergrpc.LC.LogInfo(messages.ServiceStatic, messages.LogStatusPageServed, map[string]string{
 		messages.LogReqPath:  r.URL.Path,
 		messages.LogFilename: filename,
 	})

@@ -14,10 +14,8 @@ import (
 	"github.com/spf13/viper"
 )
 
-var sessionLifetime = time.Duration(coef) * time.Minute
-
-// coef - коэффициент времени жизни сессии (в минутах)
-var coef int
+// sessionLifetime - время жизни сессии
+var sessionLifetime time.Duration
 
 // AuthHandler обрабатывает запросы аутентификации
 type AuthHandler struct {
@@ -31,7 +29,12 @@ var serverSecretKey []byte
 
 func init() {
 	serverSecretKey = []byte(viper.GetString("crypto.serverSecretKey"))
-	coef = viper.GetInt("session.lifetime")
+	coef := viper.GetInt("session.lifetime") // коэффициент времени жизни сессии (в минутах)
+	if coef <= 0 {
+		coef = 1
+	}
+
+	sessionLifetime = time.Duration(coef) * time.Minute
 }
 
 // EncryptionKey обменивается ключами для установки защищенного соединения
@@ -201,10 +204,10 @@ func (p *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	userID, err := p.User.CreateAccount(username, newPassword, role)
 	if err != nil {
 		loggergrpc.LC.LogError(messages.ServiceAuth, messages.LogErrDBQuery, map[string]string{
-			messages.LogDetails: err.Error(),
-			"username":          username,
+			messages.LogDetails:  err.Error(),
+			messages.LogUsername: username,
 		})
-		response.WriteAPIResponse(w, http.StatusBadRequest, false, messages.ClientErrUserNotFound, nil)
+		response.WriteAPIResponse(w, http.StatusBadRequest, false, messages.ClientErrCreateAccount, nil)
 		return
 	}
 

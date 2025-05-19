@@ -1,6 +1,7 @@
 package encryption
 
 import (
+	loggergrpc "api/internal/loggerGRPC"
 	"api/internal/messages"
 	"crypto/aes"
 	"crypto/cipher"
@@ -9,7 +10,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
-	"log"
+	"strconv"
 )
 
 // deriveKeyAndIV генерирует ключ и вектор инициализации из основного ключа и соли
@@ -47,23 +48,30 @@ func pkcs7Unpad(b []byte) ([]byte, error) {
 func DecryptData(cipherB64, sharedKeyHex string) (string, error) {
 	keyBytes, err := hex.DecodeString(sharedKeyHex)
 	if err != nil {
-		log.Printf(messages.LogErrHexDecode, err)
+		loggergrpc.LC.LogError(messages.ServiceEncryption, messages.LogErrHexDecode, map[string]string{
+			messages.LogDetails: err.Error(),
+		})
 		return "", errors.New(messages.ClientErrDecryption)
 	}
 
 	if len(keyBytes) != messages.CryptoKeyLength {
-		log.Printf(messages.LogErrKeyLength, messages.CryptoKeyLength, len(keyBytes))
+		loggergrpc.LC.LogError(messages.ServiceEncryption, messages.LogErrKeyLength, map[string]string{
+			messages.LogExpected: strconv.Itoa(messages.CryptoKeyLength),
+			messages.LogGot:      strconv.Itoa(len(keyBytes)),
+		})
 		return "", errors.New(messages.ClientErrDecryption)
 	}
 
 	raw, err := base64.StdEncoding.DecodeString(cipherB64)
 	if err != nil {
-		log.Printf(messages.LogErrBase64Decode, err)
+		loggergrpc.LC.LogError(messages.ServiceEncryption, messages.LogErrBase64Decode, map[string]string{
+			messages.LogDetails: err.Error(),
+		})
 		return "", errors.New(messages.ClientErrDecryption)
 	}
 
 	if len(raw) < 16 || string(raw[:8]) != messages.CryptoSaltedPrefix {
-		log.Printf(messages.LogErrMissingSalt)
+		loggergrpc.LC.LogError(messages.ServiceEncryption, messages.LogErrMissingSalt, nil)
 		return "", errors.New(messages.ClientErrDecryption)
 	}
 
@@ -72,12 +80,16 @@ func DecryptData(cipherB64, sharedKeyHex string) (string, error) {
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		log.Printf(messages.LogErrCipherInit, err)
+		loggergrpc.LC.LogError(messages.ServiceEncryption, messages.LogErrCipherInit, map[string]string{
+			messages.LogDetails: err.Error(),
+		})
 		return "", errors.New(messages.ClientErrDecryption)
 	}
 
 	if len(ciphertext)%aes.BlockSize != 0 {
-		log.Printf(messages.LogErrBlockSize, aes.BlockSize)
+		loggergrpc.LC.LogError(messages.ServiceEncryption, messages.LogErrBlockSize, map[string]string{
+			messages.LogBlockSize: strconv.Itoa(aes.BlockSize),
+		})
 		return "", errors.New(messages.ClientErrDecryption)
 	}
 
@@ -86,11 +98,15 @@ func DecryptData(cipherB64, sharedKeyHex string) (string, error) {
 
 	plain, err = pkcs7Unpad(plain)
 	if err != nil {
-		log.Printf(messages.LogErrPadding, err)
+		loggergrpc.LC.LogError(messages.ServiceEncryption, messages.LogErrPadding, map[string]string{
+			messages.LogDetails: err.Error(),
+		})
 		return "", errors.New(messages.ClientErrDecryption)
 	}
 
-	log.Printf(messages.LogStatusDecryption, len(plain))
+	loggergrpc.LC.LogInfo(messages.ServiceEncryption, messages.LogStatusDecryption, map[string]string{
+		messages.LogLength: strconv.Itoa(len(plain)),
+	})
 	return string(plain), nil
 }
 
@@ -107,12 +123,17 @@ func pkcs7Pad(b []byte) []byte {
 func EncryptData(plaintext, sharedKeyHex string) (string, error) {
 	keyBytes, err := hex.DecodeString(sharedKeyHex)
 	if err != nil {
-		log.Printf(messages.LogErrHexDecode, err)
+		loggergrpc.LC.LogError(messages.ServiceEncryption, messages.LogErrHexDecode, map[string]string{
+			messages.LogDetails: err.Error(),
+		})
 		return "", errors.New(messages.ClientErrEncryption)
 	}
 
 	if len(keyBytes) != messages.CryptoKeyLength {
-		log.Printf(messages.LogErrKeyLength, messages.CryptoKeyLength, len(keyBytes))
+		loggergrpc.LC.LogError(messages.ServiceEncryption, messages.LogErrKeyLength, map[string]string{
+			messages.LogExpected: strconv.Itoa(messages.CryptoKeyLength),
+			messages.LogGot:      strconv.Itoa(len(keyBytes)),
+		})
 		return "", errors.New(messages.ClientErrEncryption)
 	}
 
@@ -123,7 +144,9 @@ func EncryptData(plaintext, sharedKeyHex string) (string, error) {
 
 	block, err := aes.NewCipher(k)
 	if err != nil {
-		log.Printf(messages.LogErrCipherInit, err)
+		loggergrpc.LC.LogError(messages.ServiceEncryption, messages.LogErrCipherInit, map[string]string{
+			messages.LogDetails: err.Error(),
+		})
 		return "", errors.New(messages.ClientErrEncryption)
 	}
 
@@ -134,6 +157,8 @@ func EncryptData(plaintext, sharedKeyHex string) (string, error) {
 	out := append([]byte(messages.CryptoSaltedPrefix), salt...)
 	out = append(out, ciphertext...)
 
-	log.Printf(messages.LogStatusEncryption, len(out))
+	loggergrpc.LC.LogInfo(messages.ServiceEncryption, messages.LogStatusEncryption, map[string]string{
+		messages.LogLength: strconv.Itoa(len(out)),
+	})
 	return base64.StdEncoding.EncodeToString(out), nil
 }

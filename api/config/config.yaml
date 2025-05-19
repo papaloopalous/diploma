@@ -5,11 +5,11 @@ api:
 crypto:
   prime: "FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD1"
   generator: "2"
-  serverServerKey: "863d268fe1fbedad03c347670de5580d4c44486228c0bb8108840e08b6aea204"
+  serverSecretKey: "863d268fe1fbedad03c347670de5580d4c44486228c0bb8108840e08b6aea204"
 
 session:
   lifetime: 10
-  address: "localhost:50053"
+  addr: "localhost:50053"
 
 user:
   addr: "localhost:50052"

@@ -100,7 +100,7 @@ func main() {
 	sessionpb.RegisterSessionServiceServer(s, &server{db: db})
 	reflection.Register(s)
 
-	log.Printf("server running on port %s", serverPort)
+	log.Printf("server is running on port %s", serverPort)
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}

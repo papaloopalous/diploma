@@ -49,6 +49,7 @@ func CreateNewRouter() *mux.Router {
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock())
 	if err != nil {
+		log.Println(userAddr)
 		log.Fatalf("failed to connect to user service: %v", err)
 	}
 
