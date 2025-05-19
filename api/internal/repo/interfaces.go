@@ -111,7 +111,7 @@ type SessionRepo interface {
 	GetSession(sessionID uuid.UUID) (userID uuid.UUID, role string, err error)
 
 	// SetSession создает новую сессию
-	SetSession(sessionID uuid.UUID, userID uuid.UUID, role string) error
+	SetSession(sessionID uuid.UUID, userID uuid.UUID, role string, sessionLifetime time.Duration) error
 
 	// DeleteSession удаляет сессию
 	DeleteSession(sessionID uuid.UUID) (userID uuid.UUID, err error)

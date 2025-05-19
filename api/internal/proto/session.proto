@@ -19,12 +19,14 @@ message SessionIDRequest {
 message SessionResponse {
   string user_id = 1;
   string role = 2;
+  int64 expires_at = 3;  // Unix timestamp
 }
 
 message SetSessionRequest {
-  string session_id = 1;
-  string user_id = 2;
-  string role = 3;
+    string session_id = 1;
+    string user_id = 2;
+    string role = 3;
+    int64 expires_at = 4;  // Unix timestamp
 }
 
 message DeleteSessionResponse {

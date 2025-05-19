@@ -3,6 +3,7 @@ package repo
 import (
 	"api/internal/proto/sessionpb"
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
@@ -42,18 +43,17 @@ func (r *SessionRepoGRPC) GetSession(sessionID uuid.UUID) (userID uuid.UUID, rol
 }
 
 // SetSession создает новую сессию в базе данных
-func (r *SessionRepoGRPC) SetSession(sessionID uuid.UUID, userID uuid.UUID, role string) error {
+func (r *SessionRepoGRPC) SetSession(sessionID uuid.UUID, userID uuid.UUID, role string, sessionLifetime time.Duration) error {
 	ctx := context.Background()
+	expiresAt := time.Now().Add(sessionLifetime).Unix()
+
 	_, err := r.db.SetSession(ctx, &sessionpb.SetSessionRequest{
 		SessionId: sessionID.String(),
 		UserId:    userID.String(),
 		Role:      role,
+		ExpiresAt: expiresAt,
 	})
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // DeleteSession удаляет сессию из базы данных и возвращает ID пользователя

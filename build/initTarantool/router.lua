@@ -10,29 +10,30 @@ box.cfg {
     work_dir = '/var/lib/tarantool'
 }
 
--- Create spaces before configuring vshard
 box.once('init', function()
-    -- Create session space
     local sessions = box.schema.space.create('sessions', {
         format = {
             {name = 'session_id', type = 'string'},
             {name = 'user_id', type = 'string'},
-            {name = 'role', type = 'string'}
+            {name = 'role', type = 'string'},
+            {name = 'expires_at', type = 'number'}
         },
         if_not_exists = true
     })
 
-    -- Create primary index
     sessions:create_index('primary', {
         parts = {{field = 'session_id', type = 'string'}},
         if_not_exists = true
     })
 
-    -- Grant permissions
+    sessions:create_index('expires', {
+        parts = {{field = 'expires_at', type = 'number'}},
+        if_not_exists = true
+    })
+
     box.schema.user.grant('guest', 'read,write', 'space', 'sessions', nil, {if_not_exists = true})
 end)
 
--- Настраиваем роутер
 vshard.router.cfg({
     bucket_count = 100,
     sharding = {
@@ -54,7 +55,6 @@ vshard.router.cfg({
 
 log.info("Starting router configuration")
 
--- Автоматический bootstrap: запускаем в отдельной fiber, с ретраями
 box.once("bootstrap", function()
     fiber.create(function()
         local ok, err
@@ -71,5 +71,16 @@ box.once("bootstrap", function()
 end)
 
 log.info("Router started at port 3301")
+
+local function cleanup_expired_sessions()
+    box.space.sessions:delete(box.space.sessions.index.expires:select({}, {iterator = 'LE', limit = 1000}))
+end
+
+fiber.create(function()
+    while true do
+        cleanup_expired_sessions()
+        fiber.sleep(60)
+    end
+end)
 
 return vshard.router

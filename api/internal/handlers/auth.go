@@ -137,7 +137,7 @@ func (p *AuthHandler) LogIN(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = p.Session.SetSession(sessionID, userID, userRole)
+	err = p.Session.SetSession(sessionID, userID, userRole, sessionLifetime)
 	if err != nil {
 		loggergrpc.LC.LogError(messages.ServiceAuth, messages.LogErrSessionInvalid, map[string]string{
 			messages.LogSessionID: sessionID.String(),
@@ -223,7 +223,7 @@ func (p *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = p.Session.SetSession(sessionID, userID, role)
+	err = p.Session.SetSession(sessionID, userID, role, sessionLifetime)
 	if err != nil {
 		loggergrpc.LC.LogError(messages.ServiceAuth, messages.LogErrSessionInvalid, map[string]string{
 			messages.LogSessionID: sessionID.String(),

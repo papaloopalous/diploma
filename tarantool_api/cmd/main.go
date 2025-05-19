@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net"
 	"os"
 	"tarantool_api/sessionpb"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/tarantool/go-tarantool"
@@ -28,9 +30,17 @@ func (s *server) GetSession(ctx context.Context, req *sessionpb.SessionIDRequest
 	}
 
 	tuple := resp.Data[0].([]interface{})
+
+	expiresAt := tuple[3].(int64)
+	if time.Now().Unix() > expiresAt {
+		s.db.Delete("sessions", "primary", []interface{}{req.SessionId})
+		return nil, errors.New("session expired")
+	}
+
 	return &sessionpb.SessionResponse{
-		UserId: tuple[1].(string),
-		Role:   tuple[2].(string),
+		UserId:    tuple[1].(string),
+		Role:      tuple[2].(string),
+		ExpiresAt: expiresAt,
 	}, nil
 }
 
@@ -39,6 +49,7 @@ func (s *server) SetSession(ctx context.Context, req *sessionpb.SetSessionReques
 		req.SessionId,
 		req.UserId,
 		req.Role,
+		req.ExpiresAt,
 	})
 	if err != nil {
 		log.Printf("Failed to insert session: %v", err)
