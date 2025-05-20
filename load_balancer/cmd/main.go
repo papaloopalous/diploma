@@ -15,8 +15,10 @@ import (
 	"load_balancer/internal/logger"
 	"load_balancer/internal/messages"
 	"load_balancer/internal/middleware"
+	"load_balancer/metrics"
 	ratelimiter "load_balancer/rate_limiter"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 )
 
@@ -31,6 +33,7 @@ func init() {
 }
 
 func main() {
+	metrics.Init()
 	defer logger.Log.Sync()
 	serverAddr, backendAddr, interval, dbAddr, salt, defaultMaxTokens, defaultRate := configloading.SetParams()
 
@@ -64,10 +67,12 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	mux.Handle("/", middlewareHandler.LimitMiddleware(lb))
+	mux.Handle("/metrics", promhttp.Handler())
+	mux.Handle("/set_rate", setupHandler.SetRateHandler())
+	mux.Handle("/set_max", setupHandler.SetMaxHandler())
+	mux.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
 
-	mux.HandleFunc("/set_rate", setupHandler.SetRateHandler())
-	mux.HandleFunc("/set_max", setupHandler.SetMaxHandler())
+	mux.Handle("/", middlewareHandler.LimitMiddleware(lb))
 
 	server := &http.Server{
 		Addr:    serverAddr,
