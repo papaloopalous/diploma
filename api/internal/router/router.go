@@ -142,6 +142,11 @@ func CreateNewRouter() *mux.Router {
 	// Создаем основной роутер
 	router := mux.NewRouter()
 
+	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("statusOK"))
+	}).Methods("GET")
+
 	// Настраиваем раздачу статических файлов
 	router.PathPrefix("/assets/").Handler(http.StripPrefix("/assets/", http.FileServer(http.Dir("assets"))))
 

@@ -247,7 +247,7 @@ func (p *AuthHandler) LogOUT(w http.ResponseWriter, r *http.Request) {
 		loggergrpc.LC.LogError(messages.ServiceAuth, messages.LogErrSessionInvalid, map[string]string{
 			messages.LogDetails: err.Error(),
 		})
-		response.WriteAPIResponse(w, http.StatusBadRequest, false, messages.ClientErrSessionExpired, nil)
+		response.WriteAPIResponse(w, http.StatusOK, false, messages.ClientErrSessionExpired, nil)
 		return
 	}
 
@@ -257,7 +257,7 @@ func (p *AuthHandler) LogOUT(w http.ResponseWriter, r *http.Request) {
 			messages.LogSessionID: token.SessionID.String(),
 			messages.LogDetails:   err.Error(),
 		})
-		response.WriteAPIResponse(w, http.StatusBadRequest, false, messages.ClientErrSessionExpired, nil)
+		response.WriteAPIResponse(w, http.StatusOK, false, messages.ClientErrSessionExpired, nil)
 		return
 	}
 
@@ -267,7 +267,7 @@ func (p *AuthHandler) LogOUT(w http.ResponseWriter, r *http.Request) {
 			messages.LogSessionID: token.SessionID.String(),
 			messages.LogDetails:   err.Error(),
 		})
-		response.WriteAPIResponse(w, http.StatusNotFound, false, messages.ClientErrSessionExpired, nil)
+		response.WriteAPIResponse(w, http.StatusOK, false, messages.ClientErrSessionExpired, nil)
 		return
 	}
 

@@ -26,12 +26,13 @@ func (s *server) GetSession(ctx context.Context, req *sessionpb.SessionIDRequest
 		return nil, err
 	}
 	if len(resp.Data) == 0 {
-		return nil, err
+		return nil, errors.New("session not found")
 	}
 
 	tuple := resp.Data[0].([]interface{})
 
-	expiresAt := tuple[3].(int64)
+	expiresAt := int64(tuple[3].(uint64))
+
 	if time.Now().Unix() > expiresAt {
 		s.db.Delete("sessions", "primary", []interface{}{req.SessionId})
 		return nil, errors.New("session expired")

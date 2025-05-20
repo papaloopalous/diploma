@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat</title>
+    <link rel="icon" href="data:,">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
@@ -195,7 +196,7 @@
                 return;
             }
 
-            ws = new WebSocket(`ws://localhost:8080/ws?room=${roomId}`);
+            ws = new WebSocket(`ws://localhost:8081/ws?room=${roomId}`);
             
             ws.onopen = () => {
                 console.log("Connected to chat");
@@ -219,7 +220,6 @@
                         chatMessages.appendChild(messageElement);
                         chatMessages.scrollTop = chatMessages.scrollHeight;
                     } else if (message.type === 'status') {
-                        // Update existing message status
                         const messageEl = document.querySelector(`[data-message-id="${message.id}"]`);
                         if (messageEl) {
                             const statusEl = messageEl.querySelector('.message-status');

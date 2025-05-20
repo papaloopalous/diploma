@@ -1,0 +1,14 @@
+server:
+  address: "${SERVER_ADDRESS}"
+
+backends:
+  - "${BACKENDS}"
+
+db:
+  address: "${DB_ADDRESS}"
+
+maxTokens: "${MAX_TOKENS}"
+
+rate: "${RATE}"
+
+salt: "${SALT}"

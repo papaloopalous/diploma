@@ -7,11 +7,35 @@ local fiber = require('fiber')
 box.cfg {
     listen = 3301,
     memtx_memory = 128 * 1024 * 1024,
-    work_dir = '/var/lib/tarantool'
+    work_dir = '/var/lib/tarantool',
+    replication_connect_timeout = 30
 }
 
-local schemas = require('schemas')
-schemas.init_sessions_space()
+box.once('sessions_space_init', function()
+        local sessions = box.schema.space.create('sessions', {
+            format = {
+                {name = 'session_id', type = 'string'},
+                {name = 'user_id',   type = 'string'},
+                {name = 'role',      type = 'string'},
+                {name = 'expires_at',type = 'number'}
+            },
+            if_not_exists = true
+        })
+
+        sessions:create_index('primary', {
+            parts = {{field = 'session_id', type = 'string'}},
+            if_not_exists = true
+        })
+
+        sessions:create_index('expires', {
+            parts = {{field = 'expires_at', type = 'number'}},
+            if_not_exists = true
+        })
+
+        box.schema.user.grant('guest', 'read,write',
+                               'space', 'sessions', nil,
+                               {if_not_exists = true})
+    end)
 
 vshard.router.cfg({
     bucket_count = 100,
@@ -37,12 +61,14 @@ log.info("Starting router configuration")
 box.once("bootstrap", function()
     fiber.create(function()
         local ok, err
+        -- Add initial delay to allow storages to start
+        fiber.sleep(5)
         repeat
             log.info("Attempting cluster bootstrap...")
             ok, err = vshard.router.bootstrap()
             if not ok then
-                log.warn("Bootstrap failed: %s. Retrying in 1 sec...", err)
-                fiber.sleep(1)
+                log.warn("Bootstrap failed: %s. Retrying in 2 sec...", err)
+                fiber.sleep(2)
             end
         until ok
         log.info("Cluster bootstrap completed successfully.")
