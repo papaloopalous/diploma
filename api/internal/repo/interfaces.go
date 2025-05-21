@@ -17,6 +17,11 @@ type UsersList struct {
 	Rating    float32   `json:"rating"`              // Рейтинг преподавателя
 }
 
+const (
+	authorization = "authorization"
+	bearer        = "Bearer "
+)
+
 // UserRepo определяет методы для работы с пользователями в системе
 type UserRepo interface {
 	// FindUser находит пользователя по ID

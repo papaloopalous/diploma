@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 // SessionRepoGRPC реализует взаимодействие с сервисом сессий через gRPC
@@ -24,9 +25,16 @@ func NewSessionRepo(conn *grpc.ClientConn) *SessionRepoGRPC {
 	}
 }
 
+const (
+	sessionToken = "session-token"
+)
+
 // GetSession получает информацию о сессии из базы данных
 func (r *SessionRepoGRPC) GetSession(sessionID uuid.UUID) (userID uuid.UUID, role string, err error) {
-	ctx := context.Background()
+	md := metadata.New(map[string]string{
+		authorization: bearer + sessionToken,
+	})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
 	resp, err := r.db.GetSession(ctx, &sessionpb.SessionIDRequest{
 		SessionId: sessionID.String(),
 	})
@@ -44,7 +52,10 @@ func (r *SessionRepoGRPC) GetSession(sessionID uuid.UUID) (userID uuid.UUID, rol
 
 // SetSession создает новую сессию в базе данных
 func (r *SessionRepoGRPC) SetSession(sessionID uuid.UUID, userID uuid.UUID, role string, sessionLifetime time.Duration) error {
-	ctx := context.Background()
+	md := metadata.New(map[string]string{
+		authorization: bearer + sessionToken,
+	})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
 	expiresAt := time.Now().Add(sessionLifetime).Unix()
 
 	_, err := r.db.SetSession(ctx, &sessionpb.SetSessionRequest{
@@ -58,7 +69,10 @@ func (r *SessionRepoGRPC) SetSession(sessionID uuid.UUID, userID uuid.UUID, role
 
 // DeleteSession удаляет сессию из базы данных и возвращает ID пользователя
 func (r *SessionRepoGRPC) DeleteSession(sessionID uuid.UUID) (userID uuid.UUID, err error) {
-	ctx := context.Background()
+	md := metadata.New(map[string]string{
+		authorization: bearer + sessionToken,
+	})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
 	resp, err := r.db.DeleteSession(ctx, &sessionpb.SessionIDRequest{
 		SessionId: sessionID.String(),
 	})

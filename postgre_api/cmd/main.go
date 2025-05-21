@@ -10,13 +10,17 @@ import (
 	"postgre_api/chatpb"
 	"postgre_api/taskpb"
 	"postgre_api/userpb"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	pgx "github.com/jackc/pgx/v5"
 	"github.com/joho/godotenv"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -630,6 +634,111 @@ func (s *server) UpdateStatus(ctx context.Context,
 	return &chatpb.Empty{}, nil
 }
 
+const (
+	user = "user"
+	chat = "chat"
+	task = "task"
+)
+
+var acl = map[string][]string{
+	// UserService methods
+	"/user.UserService/AddUser":                {user},
+	"/user.UserService/GetUserLinks":           {user},
+	"/user.UserService/CheckCredentials":       {user},
+	"/user.UserService/GetUserByID":            {user},
+	"/user.UserService/UserExists":             {user},
+	"/user.UserService/UpdateUserProfile":      {user},
+	"/user.UserService/UpdateRating":           {user},
+	"/user.UserService/AcceptRequest":          {user},
+	"/user.UserService/HasTeacher":             {user},
+	"/user.UserService/AddRequestLink":         {user},
+	"/user.UserService/DenyRequest":            {user},
+	"/user.UserService/GetAvailableTeachers":   {user},
+	"/user.UserService/GetRating":              {user},
+	"/user.UserService/GetRequests":            {user},
+	"/user.UserService/GetStudentTeacherLinks": {user},
+	"/user.UserService/GetStudentsByTeacher":   {user},
+	"/user.UserService/GetTeachersByStudent":   {user},
+	"/user.UserService/GetUsersByIDs":          {user},
+
+	// TaskService methods
+	"/taskpb.TaskService/CreateTask":       {task},
+	"/taskpb.TaskService/GetTask":          {task},
+	"/taskpb.TaskService/GetSolution":      {task},
+	"/taskpb.TaskService/LinkFileTask":     {task},
+	"/taskpb.TaskService/LinkFileSolution": {task},
+	"/taskpb.TaskService/Grade":            {task},
+	"/taskpb.TaskService/Solve":            {task},
+	"/taskpb.TaskService/AvgGrade":         {task},
+	"/taskpb.TaskService/AllTasks":         {task},
+
+	// ChatService methods
+	"/chatpb.ChatService/CreateRoom":   {chat},
+	"/chatpb.ChatService/History":      {chat},
+	"/chatpb.ChatService/SendMessage":  {chat},
+	"/chatpb.ChatService/UpdateStatus": {chat},
+}
+
+// UnaryInterceptor — перехватчик запросов
+func UnaryInterceptor(
+	ctx context.Context,
+	req interface{},
+	info *grpc.UnaryServerInfo,
+	handler grpc.UnaryHandler,
+) (interface{}, error) {
+	// получаем метаданные
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "missing metadata")
+	}
+
+	authHeader := md.Get("authorization")
+	if len(authHeader) == 0 {
+		return nil, status.Error(codes.Unauthenticated, "missing token")
+	}
+
+	token := strings.TrimPrefix(authHeader[0], "Bearer ")
+	role, err := getRoleByToken(token)
+	if err != nil {
+		return nil, status.Error(codes.PermissionDenied, "invalid token")
+	}
+
+	allowedRoles, ok := acl[info.FullMethod]
+	if !ok {
+		return nil, status.Error(codes.PermissionDenied, "method not allowed")
+	}
+
+	if !contains(allowedRoles, role) {
+		return nil, status.Error(codes.PermissionDenied, "access denied")
+	}
+
+	// всё ок → вызываем сам метод
+	return handler(ctx, req)
+}
+
+// простая имитация проверки токена
+func getRoleByToken(token string) (string, error) {
+	switch token {
+	case "chat-token":
+		return chat, nil
+	case "user-token":
+		return user, nil
+	case "task-token":
+		return task, nil
+	default:
+		return "", status.Error(codes.Unauthenticated, "unknown token")
+	}
+}
+
+func contains(list []string, target string) bool {
+	for _, item := range list {
+		if item == target {
+			return true
+		}
+	}
+	return false
+}
+
 func main() {
 	err := godotenv.Load()
 	if err != nil {
@@ -659,7 +768,7 @@ func main() {
 		}
 	}()
 
-	grpcServer := grpc.NewServer()
+	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(UnaryInterceptor))
 	server := &server{db: conn}
 	userpb.RegisterUserServiceServer(grpcServer, server)
 	taskpb.RegisterTaskServiceServer(grpcServer, server)

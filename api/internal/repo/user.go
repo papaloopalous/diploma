@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 // UserRepoGRPC реализует взаимодействие с сервисом пользователей через gRPC
@@ -24,9 +25,16 @@ func NewUserRepo(conn *grpc.ClientConn) *UserRepoGRPC {
 	}
 }
 
+const (
+	userToken = "user-token"
+)
+
 // CreateAccount создает новую учетную запись
 func (r *UserRepoGRPC) CreateAccount(username string, pass string, role string) (uuid.UUID, error) {
-	ctx := context.Background()
+	md := metadata.New(map[string]string{
+		authorization: bearer + userToken,
+	})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
 	existsResp, err := r.db.UserExists(ctx, &userpb.UsernameRequest{Username: username})
 	if err != nil {
 		return uuid.Nil, err
@@ -47,7 +55,10 @@ func (r *UserRepoGRPC) CreateAccount(username string, pass string, role string) 
 
 // CheckPass проверяет учетные данные пользователя
 func (r *UserRepoGRPC) CheckPass(username string, pass string) (uuid.UUID, string, error) {
-	ctx := context.Background()
+	md := metadata.New(map[string]string{
+		authorization: bearer + userToken,
+	})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
 	resp, err := r.db.CheckCredentials(ctx, &userpb.CredentialsRequest{
 		Username: username,
 		Password: pass,
@@ -60,7 +71,10 @@ func (r *UserRepoGRPC) CheckPass(username string, pass string) (uuid.UUID, strin
 
 // FindUser находит пользователя по ID
 func (r *UserRepoGRPC) FindUser(userID uuid.UUID) (UsersList, error) {
-	ctx := context.Background()
+	md := metadata.New(map[string]string{
+		authorization: bearer + userToken,
+	})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
 	resp, err := r.db.GetUserByID(ctx, &userpb.UserIDRequest{Id: userID.String()})
 	if err != nil {
 		return UsersList{}, err
@@ -77,7 +91,10 @@ func (r *UserRepoGRPC) FindUser(userID uuid.UUID) (UsersList, error) {
 
 // FillProfile обновляет профиль пользователя
 func (r *UserRepoGRPC) FillProfile(userID uuid.UUID, userData UsersList) error {
-	ctx := context.Background()
+	md := metadata.New(map[string]string{
+		authorization: bearer + userToken,
+	})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
 	_, err := r.db.UpdateUserProfile(ctx, &userpb.UpdateProfileRequest{
 		Id:        userID.String(),
 		Fio:       userData.Fio,
@@ -93,7 +110,10 @@ func (r *UserRepoGRPC) FillProfile(userID uuid.UUID, userData UsersList) error {
 
 // AddRequest создает запрос на обучение
 func (r *UserRepoGRPC) AddRequest(studentID, teacherID uuid.UUID) error {
-	ctx := context.Background()
+	md := metadata.New(map[string]string{
+		authorization: bearer + userToken,
+	})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
 	_, err := r.db.AddRequestLink(ctx, &userpb.RelationRequest{
 		FromId: studentID.String(),
 		ToId:   teacherID.String(),
@@ -106,7 +126,10 @@ func (r *UserRepoGRPC) AddRequest(studentID, teacherID uuid.UUID) error {
 
 // Accept подтверждает запрос на обучение
 func (r *UserRepoGRPC) Accept(teacherID, studentID uuid.UUID) error {
-	ctx := context.Background()
+	md := metadata.New(map[string]string{
+		authorization: bearer + userToken,
+	})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
 	_, err := r.db.AcceptRequest(ctx, &userpb.RelationRequest{
 		FromId: teacherID.String(),
 		ToId:   studentID.String(),
@@ -119,7 +142,10 @@ func (r *UserRepoGRPC) Accept(teacherID, studentID uuid.UUID) error {
 
 // Deny отклоняет запрос на обучение
 func (r *UserRepoGRPC) Deny(teacherID, studentID uuid.UUID) error {
-	ctx := context.Background()
+	md := metadata.New(map[string]string{
+		authorization: bearer + userToken,
+	})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
 	_, err := r.db.DenyRequest(ctx, &userpb.RelationRequest{
 		FromId: teacherID.String(),
 		ToId:   studentID.String(),
@@ -132,7 +158,10 @@ func (r *UserRepoGRPC) Deny(teacherID, studentID uuid.UUID) error {
 
 // ShowRequests возвращает список запросов на обучение
 func (r *UserRepoGRPC) ShowRequests(userID uuid.UUID) ([]UsersList, error) {
-	ctx := context.Background()
+	md := metadata.New(map[string]string{
+		authorization: bearer + userToken,
+	})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
 	reqIDs, err := r.db.GetRequests(ctx, &userpb.UserIDRequest{Id: userID.String()})
 	if err != nil {
 		return nil, err
@@ -157,7 +186,10 @@ func (r *UserRepoGRPC) ShowRequests(userID uuid.UUID) ([]UsersList, error) {
 
 // AddRating добавляет и усредняет оценку преподавателя
 func (r *UserRepoGRPC) AddRating(userID uuid.UUID, newRating float32) error {
-	ctx := context.Background()
+	md := metadata.New(map[string]string{
+		authorization: bearer + userToken,
+	})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
 
 	resp, err := r.db.GetRating(ctx, &userpb.UserIDRequest{Id: userID.String()})
 	if err != nil {
@@ -175,7 +207,10 @@ func (r *UserRepoGRPC) AddRating(userID uuid.UUID, newRating float32) error {
 
 // HasThatTeacher проверяет связь студента с преподавателем
 func (r *UserRepoGRPC) HasThatTeacher(studentID, teacherID uuid.UUID) (bool, error) {
-	ctx := context.Background()
+	md := metadata.New(map[string]string{
+		authorization: bearer + userToken,
+	})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
 	resp, err := r.db.HasTeacher(ctx, &userpb.RelationRequest{
 		FromId: studentID.String(),
 		ToId:   teacherID.String(),
@@ -188,7 +223,10 @@ func (r *UserRepoGRPC) HasThatTeacher(studentID, teacherID uuid.UUID) (bool, err
 
 // StudentsByTeacher возвращает список студентов преподавателя
 func (r *UserRepoGRPC) StudentsByTeacher(teacherID uuid.UUID) ([]UsersList, error) {
-	ctx := context.Background()
+	md := metadata.New(map[string]string{
+		authorization: bearer + userToken,
+	})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
 	resp, err := r.db.GetStudentsByTeacher(ctx, &userpb.UserIDRequest{Id: teacherID.String()})
 	if err != nil {
 		return nil, err
@@ -207,7 +245,10 @@ func (r *UserRepoGRPC) StudentsByTeacher(teacherID uuid.UUID) ([]UsersList, erro
 
 // TeachersByStudent возвращает список преподавателей студента
 func (r *UserRepoGRPC) TeachersByStudent(studentID uuid.UUID) ([]UsersList, error) {
-	ctx := context.Background()
+	md := metadata.New(map[string]string{
+		authorization: bearer + userToken,
+	})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
 	resp, err := r.db.GetTeachersByStudent(ctx, &userpb.UserIDRequest{Id: studentID.String()})
 	if err != nil {
 		return nil, err
@@ -228,7 +269,10 @@ func (r *UserRepoGRPC) TeachersByStudent(studentID uuid.UUID) ([]UsersList, erro
 
 // EditGrade обновляет среднюю оценку студента
 func (r *UserRepoGRPC) EditGrade(studentID uuid.UUID, grade float32) error {
-	ctx := context.Background()
+	md := metadata.New(map[string]string{
+		authorization: bearer + userToken,
+	})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
 	_, err := r.db.UpdateRating(ctx, &userpb.UpdateRatingRequest{
 		Id:        studentID.String(),
 		NewRating: grade,
@@ -241,7 +285,10 @@ func (r *UserRepoGRPC) EditGrade(studentID uuid.UUID, grade float32) error {
 
 // outBySpecialty вспомогательная функция для сортировки преподавателей
 func (r *UserRepoGRPC) outBySpecialty(orderField, specialty string, studentID uuid.UUID, ascending bool) ([]UsersList, error) {
-	ctx := context.Background()
+	md := metadata.New(map[string]string{
+		authorization: bearer + userToken,
+	})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
 
 	links, err := r.db.GetUserLinks(ctx, &userpb.UserIDRequest{Id: studentID.String()})
 	if err != nil {

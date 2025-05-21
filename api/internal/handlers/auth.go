@@ -119,8 +119,8 @@ func (p *AuthHandler) LogIN(w http.ResponseWriter, r *http.Request) {
 	userID, userRole, err := p.User.CheckPass(username, newPassword)
 	if err != nil {
 		loggergrpc.LC.LogError(messages.ServiceAuth, messages.LogErrAuthFailed, map[string]string{
-			messages.LogDetails: err.Error(),
-			"username":          username,
+			messages.LogDetails:  err.Error(),
+			messages.LogUsername: username,
 		})
 		response.WriteAPIResponse(w, http.StatusUnauthorized, false, messages.ClientErrAuth, nil)
 		return
@@ -133,7 +133,7 @@ func (p *AuthHandler) LogIN(w http.ResponseWriter, r *http.Request) {
 			messages.LogSessionID: sessionID.String(),
 			messages.LogDetails:   err.Error(),
 		})
-		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ClientErrSessionExpired, nil)
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ClientErrSessionCreation, nil)
 		return
 	}
 
@@ -143,7 +143,7 @@ func (p *AuthHandler) LogIN(w http.ResponseWriter, r *http.Request) {
 			messages.LogSessionID: sessionID.String(),
 			messages.LogDetails:   err.Error(),
 		})
-		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ClientErrSessionExpired, nil)
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ClientErrSessionCreation, nil)
 		return
 	}
 
@@ -219,7 +219,7 @@ func (p *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 			messages.LogSessionID: sessionID.String(),
 			messages.LogDetails:   err.Error(),
 		})
-		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ClientErrSessionExpired, nil)
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ClientErrSessionCreation, nil)
 		return
 	}
 
@@ -229,7 +229,7 @@ func (p *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 			messages.LogSessionID: sessionID.String(),
 			messages.LogDetails:   err.Error(),
 		})
-		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ClientErrSessionExpired, nil)
+		response.WriteAPIResponse(w, http.StatusInternalServerError, false, messages.ClientErrSessionCreation, nil)
 		return
 	}
 

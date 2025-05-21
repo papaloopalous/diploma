@@ -102,6 +102,7 @@ const (
 	ClientErrBadRequest       = "некорректный запрос"
 	ClientErrNoPermission     = "нет прав доступа"
 	ClientErrSessionExpired   = "сессия истекла"
+	ClientErrSessionCreation  = "ошибка создания сессии"
 	ClientErrUserNotFound     = "пользователь не найден"
 	ClientErrTaskNotFound     = "задание не найдено"
 	ClientErrBadID            = "некорректный идентификатор"

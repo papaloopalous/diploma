@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -24,9 +25,17 @@ func NewChatRepo(conn *grpc.ClientConn) *ChatRepoGRPC {
 	}
 }
 
+const (
+	chatToken = "chat-token"
+)
+
 // CreateRoom создает новую комнату чата для двух пользователей
 func (r *ChatRepoGRPC) CreateRoom(user1, user2 uuid.UUID) (string, bool, error) {
-	resp, err := r.db.CreateRoom(context.Background(), &chatpb.CreateRoomRequest{
+	md := metadata.New(map[string]string{
+		authorization: bearer + chatToken,
+	})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
+	resp, err := r.db.CreateRoom(ctx, &chatpb.CreateRoomRequest{
 		User1Id: user1.String(),
 		User2Id: user2.String(),
 	})
@@ -38,7 +47,11 @@ func (r *ChatRepoGRPC) CreateRoom(user1, user2 uuid.UUID) (string, bool, error) 
 
 // History возвращает историю сообщений для указанной комнаты
 func (r *ChatRepoGRPC) History(roomID string) ([]ChatMessage, error) {
-	resp, err := r.db.History(context.Background(), &chatpb.RoomIDRequest{RoomId: roomID})
+	md := metadata.New(map[string]string{
+		authorization: bearer + chatToken,
+	})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
+	resp, err := r.db.History(ctx, &chatpb.RoomIDRequest{RoomId: roomID})
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +72,11 @@ func (r *ChatRepoGRPC) History(roomID string) ([]ChatMessage, error) {
 
 // SaveMessage сохраняет новое сообщение в базе данных
 func (r *ChatRepoGRPC) SaveMessage(msg ChatMessage) error {
-	_, err := r.db.SendMessage(context.Background(), &chatpb.SendMessageRequest{
+	md := metadata.New(map[string]string{
+		authorization: bearer + chatToken,
+	})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
+	_, err := r.db.SendMessage(ctx, &chatpb.SendMessageRequest{
 		Message: &chatpb.MessageInfo{
 			Id:       msg.ID.String(),
 			RoomId:   msg.RoomID,
@@ -74,7 +91,11 @@ func (r *ChatRepoGRPC) SaveMessage(msg ChatMessage) error {
 
 // UpdateStatus обновляет статус сообщения
 func (r *ChatRepoGRPC) UpdateStatus(msgID uuid.UUID, status chatpb.MessageStatus) error {
-	_, err := r.db.UpdateStatus(context.Background(), &chatpb.UpdateStatusRequest{
+	md := metadata.New(map[string]string{
+		authorization: bearer + chatToken,
+	})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
+	_, err := r.db.UpdateStatus(ctx, &chatpb.UpdateStatusRequest{
 		Id:     msgID.String(),
 		Status: status,
 	})

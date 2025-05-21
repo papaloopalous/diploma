@@ -6,13 +6,17 @@ import (
 	"log"
 	"net"
 	"os"
+	"strings"
 	"tarantool_api/sessionpb"
 	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/tarantool/go-tarantool"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/status"
 )
 
 type server struct {
@@ -74,6 +78,73 @@ func (s *server) DeleteSession(ctx context.Context, req *sessionpb.SessionIDRequ
 	}, nil
 }
 
+const (
+	session = "session"
+)
+
+var acl = map[string][]string{
+	// SessionService methods
+	"/sessionpb.SessionService/GetSession":    {session},
+	"/sessionpb.SessionService/SetSession":    {session},
+	"/sessionpb.SessionService/DeleteSession": {session},
+}
+
+// UnaryInterceptor — перехватчик запросов
+func UnaryInterceptor(
+	ctx context.Context,
+	req interface{},
+	info *grpc.UnaryServerInfo,
+	handler grpc.UnaryHandler,
+) (interface{}, error) {
+	// получаем метаданные
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "missing metadata")
+	}
+
+	authHeader := md.Get("authorization")
+	if len(authHeader) == 0 {
+		return nil, status.Error(codes.Unauthenticated, "missing token")
+	}
+
+	token := strings.TrimPrefix(authHeader[0], "Bearer ")
+	role, err := getRoleByToken(token)
+	if err != nil {
+		return nil, status.Error(codes.PermissionDenied, "invalid token")
+	}
+
+	allowedRoles, ok := acl[info.FullMethod]
+	if !ok {
+		return nil, status.Error(codes.PermissionDenied, "method not allowed")
+	}
+
+	if !contains(allowedRoles, role) {
+		return nil, status.Error(codes.PermissionDenied, "access denied")
+	}
+
+	// всё ок → вызываем сам метод
+	return handler(ctx, req)
+}
+
+// простая имитация проверки токена
+func getRoleByToken(token string) (string, error) {
+	switch token {
+	case "session-token":
+		return session, nil
+	default:
+		return "", status.Error(codes.Unauthenticated, "unknown token")
+	}
+}
+
+func contains(list []string, target string) bool {
+	for _, item := range list {
+		if item == target {
+			return true
+		}
+	}
+	return false
+}
+
 func main() {
 	err := godotenv.Load()
 	if err != nil {
@@ -108,7 +179,7 @@ func main() {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
-	s := grpc.NewServer()
+	s := grpc.NewServer(grpc.UnaryInterceptor(UnaryInterceptor))
 	sessionpb.RegisterSessionServiceServer(s, &server{db: db})
 	reflection.Register(s)
 

@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 // TaskRepoGRPC реализует взаимодействие с сервисом заданий через gRPC
@@ -23,9 +24,16 @@ func NewTaskRepo(conn *grpc.ClientConn) *TaskRepoGRPC {
 	}
 }
 
+const (
+	taskToken = "task-token"
+)
+
 // CreateTask создает новое задание в базе данных
 func (r *TaskRepoGRPC) CreateTask(teacher uuid.UUID, student uuid.UUID, name string, studentFIO string, teacherFIO string) (uuid.UUID, error) {
-	ctx := context.Background()
+	md := metadata.New(map[string]string{
+		authorization: bearer + taskToken,
+	})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
 	resp, err := r.db.CreateTask(ctx, &taskpb.CreateTaskRequest{
 		TeacherId:  teacher.String(),
 		StudentId:  student.String(),
@@ -41,7 +49,10 @@ func (r *TaskRepoGRPC) CreateTask(teacher uuid.UUID, student uuid.UUID, name str
 
 // GetTask получает файл задания из хранилища
 func (r *TaskRepoGRPC) GetTask(taskID uuid.UUID) (fileName string, fileData []byte, err error) {
-	ctx := context.Background()
+	md := metadata.New(map[string]string{
+		authorization: bearer + taskToken,
+	})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
 	resp, err := r.db.GetTask(ctx, &taskpb.TaskIDRequest{
 		Id: taskID.String(),
 	})
@@ -56,7 +67,10 @@ func (r *TaskRepoGRPC) GetTask(taskID uuid.UUID) (fileName string, fileData []by
 
 // GetSolution получает файл решения из хранилища
 func (r *TaskRepoGRPC) GetSolution(taskID uuid.UUID) (fileName string, fileData []byte, err error) {
-	ctx := context.Background()
+	md := metadata.New(map[string]string{
+		authorization: bearer + taskToken,
+	})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
 	resp, err := r.db.GetSolution(ctx, &taskpb.TaskIDRequest{
 		Id: taskID.String(),
 	})
@@ -71,7 +85,10 @@ func (r *TaskRepoGRPC) GetSolution(taskID uuid.UUID) (fileName string, fileData 
 
 // LinkFileTask прикрепляет файл к заданию в хранилище
 func (r *TaskRepoGRPC) LinkFileTask(taskID uuid.UUID, fileName string, fileData []byte) error {
-	ctx := context.Background()
+	md := metadata.New(map[string]string{
+		authorization: bearer + taskToken,
+	})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
 	_, err := r.db.LinkFileTask(ctx, &taskpb.LinkFileRequest{
 		TaskId:   taskID.String(),
 		FileName: fileName,
@@ -85,7 +102,10 @@ func (r *TaskRepoGRPC) LinkFileTask(taskID uuid.UUID, fileName string, fileData 
 
 // LinkFileSolution прикрепляет файл решения к заданию в хранилище
 func (r *TaskRepoGRPC) LinkFileSolution(taskID uuid.UUID, fileName string, fileData []byte) error {
-	ctx := context.Background()
+	md := metadata.New(map[string]string{
+		authorization: bearer + taskToken,
+	})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
 	_, err := r.db.LinkFileSolution(ctx, &taskpb.LinkFileRequest{
 		TaskId:   taskID.String(),
 		FileName: fileName,
@@ -99,7 +119,10 @@ func (r *TaskRepoGRPC) LinkFileSolution(taskID uuid.UUID, fileName string, fileD
 
 // Grade выставляет оценку за задание и возвращает ID студента
 func (r *TaskRepoGRPC) Grade(taskID uuid.UUID, grade uint8) (studentID uuid.UUID, err error) {
-	ctx := context.Background()
+	md := metadata.New(map[string]string{
+		authorization: bearer + taskToken,
+	})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
 	resp, err := r.db.Grade(ctx, &taskpb.GradeRequest{
 		TaskId: taskID.String(),
 		Grade:  uint32(grade),
@@ -112,7 +135,10 @@ func (r *TaskRepoGRPC) Grade(taskID uuid.UUID, grade uint8) (studentID uuid.UUID
 
 // Solve отмечает задание как решенное
 func (r *TaskRepoGRPC) Solve(taskID uuid.UUID) error {
-	ctx := context.Background()
+	md := metadata.New(map[string]string{
+		authorization: bearer + taskToken,
+	})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
 	_, err := r.db.Solve(ctx, &taskpb.TaskIDRequest{
 		Id: taskID.String(),
 	})
@@ -124,7 +150,10 @@ func (r *TaskRepoGRPC) Solve(taskID uuid.UUID) error {
 
 // AvgGrade вычисляет среднюю оценку студента по всем заданиям
 func (r *TaskRepoGRPC) AvgGrade(studentID uuid.UUID) (grade float32, err error) {
-	ctx := context.Background()
+	md := metadata.New(map[string]string{
+		authorization: bearer + taskToken,
+	})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
 	resp, err := r.db.AvgGrade(ctx, &taskpb.StudentIDRequest{
 		StudentId: studentID.String(),
 	})
@@ -136,7 +165,10 @@ func (r *TaskRepoGRPC) AvgGrade(studentID uuid.UUID) (grade float32, err error) 
 
 // AllTasks возвращает список всех заданий пользователя
 func (r *TaskRepoGRPC) AllTasks(userID uuid.UUID) []taskList {
-	ctx := context.Background()
+	md := metadata.New(map[string]string{
+		authorization: bearer + taskToken,
+	})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
 	resp, err := r.db.AllTasks(ctx, &taskpb.UserIDRequest{
 		UserId: userID.String(),
 	})

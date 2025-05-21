@@ -37,7 +37,7 @@ document.getElementById('loginForm').addEventListener('submit', async e => {
       $ok.style.display = 'block';
       location.href = 'main';
     } else {
-      throw new Error(`Error: ${result.message} (code ${result.statusCode})`);
+      throw new Error(`${result.message}`);
     }
   } catch (err) {
     $err.textContent = err.message || 'Unexpected error';

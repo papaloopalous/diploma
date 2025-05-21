@@ -38,7 +38,7 @@ document.getElementById('registerForm').addEventListener('submit', async e => {
       $ok.style.display = 'block';
       location.href = 'fill-profile';
     } else {
-      throw new Error(`Error: ${result.message} (code ${result.statusCode})`);
+      throw new Error(`${result.message}`);
     }
   } catch (err) {
     $err.textContent = err.message || 'Unexpected error';

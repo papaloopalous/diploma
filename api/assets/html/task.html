@@ -1,27 +1,30 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <title>Загрузка задания</title>
-  <link rel="stylesheet" href="../assets/css/style.css" />
-  <link rel="icon" href="data:,">
-  <script src="https://unpkg.com/fflate@0.7.4/umd/index.js"></script>
+    <meta charset="UTF-8">
+    <title>Загрузка задания</title>
+    <link rel="stylesheet" href="../assets/css/style.css" />
+    <link rel="icon" href="data:,">
+    <script src="https://unpkg.com/fflate@0.7.4/umd/index.js"></script>
 </head>
 <body onload="fillFromQuery()">
-  <div class="container">
-    <h1>Загрузка задания</h1>
+    <div class="container">
+        <div class="task-header">
+            <h1>Загрузка задания</h1>
+            <button class="nav-button" onclick="window.location.href='/main'">На главную</button>
+        </div>
 
-    <label for="taskName">Название задания:</label>
-    <input type="text" id="taskName" placeholder="например, Моя работа" required />
+        <label for="taskName">Название задания:</label>
+        <input type="text" id="taskName" placeholder="например, Моя работа" required />
 
-    <label for="fileInput">Файл (.docx):</label>
-    <input type="file" id="fileInput" accept=".docx" required />
+        <label for="fileInput">Файл (.docx):</label>
+        <input type="file" id="fileInput" accept=".docx" required />
 
-    <button onclick="uploadFile()">Загрузить</button>
+        <button onclick="uploadFile()">Загрузить</button>
 
-    <div id="statusBox" class="alert" style="display: none;"></div>
-  </div>
+        <div id="statusBox" class="alert" style="display: none;"></div>
+    </div>
 
-  <script src="/assets/js/task.js"></script>
+    <script src="/assets/js/task.js"></script>
 </body>
 </html>

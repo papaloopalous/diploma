@@ -3,265 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat</title>
+    <title>Чат</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
     <link rel="icon" href="data:,">
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: #f0f2f5;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .chat-container {
-            flex: 1;
-            max-width: 1000px;
-            margin: 20px auto;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        .chat-header {
-            padding: 16px;
-            background: #ffffff;
-            border-bottom: 1px solid #e4e6eb;
-            display: flex;
-            align-items: center;
-        }
-
-        .chat-header h2 {
-            margin-left: 12px;
-            font-size: 16px;
-            color: #050505;
-        }
-
-        .chat-messages {
-            flex: 1;
-            padding: 20px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .message {
-            max-width: 60%;
-            padding: 8px 12px;
-            border-radius: 18px;
-            position: relative;
-            word-wrap: break-word;
-        }
-
-        .message-sent {
-            align-self: flex-end;
-            background: #0084ff;
-            color: white;
-            margin-left: 40px;
-        }
-
-        .message-received {
-            align-self: flex-start;
-            background: #e4e6eb;
-            color: #050505;
-            margin-right: 40px;
-        }
-
-        .message-status {
-            font-size: 11px;
-            color: #65676b;
-            text-align: right;
-            margin-top: 4px;
-        }
-
-        .message-time {
-            font-size: 11px;
-            color: #65676b;
-            margin-top: 4px;
-        }
-
-        .chat-input {
-            padding: 16px;
-            background: #ffffff;
-            border-top: 1px solid #e4e6eb;
-            display: flex;
-            gap: 8px;
-        }
-
-        .chat-input input {
-            flex: 1;
-            padding: 8px 12px;
-            border: 1px solid #e4e6eb;
-            border-radius: 20px;
-            outline: none;
-            font-size: 15px;
-        }
-
-        .chat-input input:focus {
-            border-color: #0084ff;
-        }
-
-        .chat-input button {
-            padding: 8px 16px;
-            background: #0084ff;
-            color: white;
-            border: none;
-            border-radius: 20px;
-            cursor: pointer;
-            font-weight: 600;
-        }
-
-        .chat-input button:hover {
-            background: #0073e6;
-        }
-
-        .status-indicator {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            display: inline-block;
-            margin-left: 4px;
-        }
-
-        .status-online {
-            background: #31a24c;
-        }
-
-        .status-offline {
-            background: #65676b;
-        }
-
-        .message-status[data-status="sent"] {
-            color: rgba(255, 255, 255, 0.5);
-        }
-        .message-status[data-status="delivered"] {
-            color: rgba(255, 255, 255, 1);
-        }
-    </style>
 </head>
 <body>
     <div class="chat-container">
         <div class="chat-header">
             <div class="status-indicator status-online"></div>
-            <h2 id="chat-title">Chat Room</h2>
+            <h2 id="chat-title">Чат</h2>
+            <button class="nav-button" onclick="window.location.href='/main'">На главную</button>
         </div>
 
         <div class="chat-messages" id="chat-messages"></div>
 
         <div class="chat-input">
-            <input 
-                type="text" 
+            <textarea 
                 id="message-input" 
-                placeholder="Type a message..." 
+                placeholder="Введите сообщение..." 
+                rows="1"
                 autocomplete="off"
-            >
-            <button id="send-button">Send</button>
+            ></textarea>
+            <button id="send-button">Отправить</button>
         </div>
     </div>
 
-    <script>
-        const messageTemplate = (message) => `
-            <div class="message ${message.isSender ? 'message-sent' : 'message-received'}" data-message-id="${message.id}">
-                ${message.text}
-                <div class="message-time">
-                    ${new Date(message.sentAt).toLocaleTimeString()}
-                </div>
-                ${message.isSender ? `
-                    <div class="message-status" data-status="${message.status}">
-                        ${getStatusIcon(message.status)}
-                    </div>
-                ` : ''}
-            </div>
-        `;
-
-        const getStatusIcon = (status) => {
-            switch (status) {
-                case 'sent': return '✓';
-                case 'delivered': return '✓✓';
-                default: return '✓';
-            }
-        };
-
-        let ws;
-        const connectWebSocket = () => {
-            const roomId = new URLSearchParams(window.location.search).get('room');
-            if (!roomId) {
-                console.error('No room ID provided');
-                return;
-            }
-
-            ws = new WebSocket(`ws://localhost:8081/ws?room=${roomId}`);
-            
-            ws.onopen = () => {
-                console.log("Connected to chat");
-                document.querySelector('.status-indicator').classList.replace('status-offline', 'status-online');
-            };
-
-            ws.onclose = () => {
-                console.log("Disconnected from chat");
-                document.querySelector('.status-indicator').classList.replace('status-online', 'status-offline');
-                setTimeout(connectWebSocket, 3000);
-            };
-
-            ws.onmessage = (event) => {
-                try {
-                    const message = JSON.parse(event.data);
-                    const chatMessages = document.getElementById('chat-messages');
-                    
-                    if (message.type === 'message') {
-                        const messageElement = document.createElement('div');
-                        messageElement.innerHTML = messageTemplate(message);
-                        chatMessages.appendChild(messageElement);
-                        chatMessages.scrollTop = chatMessages.scrollHeight;
-                    } else if (message.type === 'status') {
-                        const messageEl = document.querySelector(`[data-message-id="${message.id}"]`);
-                        if (messageEl) {
-                            const statusEl = messageEl.querySelector('.message-status');
-                            if (statusEl) {
-                                statusEl.setAttribute('data-status', message.status);
-                                statusEl.innerHTML = getStatusIcon(message.status);
-                            }
-                        }
-                    }
-                } catch (err) {
-                    console.error('Failed to parse message:', err);
-                }
-            };
-        };
-
-        document.getElementById('send-button').addEventListener('click', () => {
-            const input = document.getElementById('message-input');
-            const text = input.value.trim();
-            
-            if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
-
-            const message = {
-                type: 'message',
-                text: text,
-                sentAt: new Date().toISOString()
-            };
-
-            ws.send(JSON.stringify(message));
-            input.value = '';
-        });
-
-        document.getElementById('message-input').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                document.getElementById('send-button').click();
-            }
-        });
-
-        try {
-            connectWebSocket();
-        } catch (err) {
-            console.error('Failed to connect:', err);
-        }
-    </script>
+    <script src="../assets/js/chat.js"></script>
 </body>
 </html>
