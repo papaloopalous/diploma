@@ -147,6 +147,7 @@ const (
 	ClientErrBadToken         = "некорректный токен"
 	ClientErrNoSession        = "сессия не найдена"
 	ClientErrCreateAccount    = "ошибка создания аккаунта"
+	ClientErrUserExists       = "пользователь с таким именем уже существует"
 )
 
 // Логи ошибок (подробные, для отладки)
@@ -220,6 +221,7 @@ const (
 	LogErrNoAuthToken      = "missing auth token"
 	LogErrParseToken       = "failed to parse JWT token"
 	LogErrSessionNotFound  = "session not found"
+	LogErrUserExists       = "user already exists"
 )
 
 // Статусы успешных операций для клиента

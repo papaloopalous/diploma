@@ -211,6 +211,14 @@ func (p *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if userID == uuid.Nil {
+		loggergrpc.LC.LogError(messages.ServiceAuth, messages.LogErrUserExists, map[string]string{
+			messages.LogUsername: username,
+		})
+		response.WriteAPIResponse(w, http.StatusBadRequest, false, messages.ClientErrUserExists, nil)
+		return
+	}
+
 	sessionID := uuid.New()
 
 	token, err := p.Token.GenerateJWT(sessionID)
