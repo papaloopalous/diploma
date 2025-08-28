@@ -1,0 +1,16 @@
+server:
+  address: ":${BALANCER_PORT}"
+
+backends:
+  - "http://${API_HOST}:${API_PORT}"
+
+interval: "${INTERVAL}"
+
+db:
+  address: "${REDIS_HOST}:${REDIS_ADDR}"
+
+maxTokens: "${MAX_TOKENS}"
+
+rate: "${RATE}"
+
+salt: "${SALT}"

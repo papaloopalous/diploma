@@ -31,7 +31,9 @@ func (lb *loadBalancer) HealthCheck(ctx context.Context, tick <-chan time.Time) 
 						logger.Log.Info(messages.InfoUnreachable, zap.String(messages.URL, backend.GetURL()))
 						backend.SetStatus(false)
 					} else {
-						logger.Log.Info(messages.InfoReachable, zap.String(messages.URL, backend.GetURL()))
+						if !backend.IsAlive() {
+							logger.Log.Info(messages.InfoReachable, zap.String(messages.URL, backend.GetURL()))
+						}
 						backend.SetStatus(true)
 					}
 				}(b)

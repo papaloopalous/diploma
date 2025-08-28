@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"diploma/logservice"
+	"api/logservice"
 
 	"google.golang.org/grpc"
 )

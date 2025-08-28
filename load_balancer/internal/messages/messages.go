@@ -18,7 +18,7 @@ const (
 	ErrFind               = "failed to find due to concurrent modification of IP %s: %v"
 	ErrInsert             = "failed to insert due to concurrent modification of IP %s: %v"
 	ErrNoData             = "no data found for IP %s"
-	ErrLimiter            = "rate limiter failed to procees the request"
+	ErrLimiter            = "rate limiter failed to process the request"
 	ErrTooManyRequests    = "rate limit exceeded"
 	ErrNoAvailableToken   = "no tokens are available"
 	ErrGetKeys            = "failed to list Redis keys"

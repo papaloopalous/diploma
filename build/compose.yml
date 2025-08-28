@@ -1,0 +1,160 @@
+services:
+  diploma_load_balancer:
+    image: papaloopalous/diploma_load_balancer:latest
+    depends_on:
+      - diploma_api
+    restart: unless-stopped
+    volumes:
+      - ./balancer_logs:/app/logs
+      - ./configs/load_balancer.yaml:/app/config/config.yaml
+    ports:
+      - "${BALANCER_PORT}:${BALANCER_PORT}"
+
+  diploma_api:
+    image: papaloopalous/diploma_api:latest
+    depends_on:
+      - diploma_postgre_api
+      - diploma_tarantool_api
+    restart: unless-stopped
+    volumes:
+      - ./configs/api.yaml:/app/config/config.yaml
+    expose:
+      - "${API_PORT}"
+
+  diploma_logger:
+    image: papaloopalous/diploma_logger:latest
+    restart: unless-stopped
+    volumes:
+      - ./api_logs:/app/logs
+      - ./configs/logger.env:/app/.env
+    expose:
+      - "${LOGGER_PORT}"
+
+  diploma_postgre_api:
+    image: papaloopalous/diploma_postgre_api:latest
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    volumes:
+      - ./configs/postgre_api.env:/app/.env
+    expose:
+      - "${POSTGRE_API_PORT}"
+
+  diploma_tarantool_api:
+    image: papaloopalous/diploma_tarantool_api:latest
+    depends_on:
+      - router
+    restart: unless-stopped
+    volumes:
+      - ./configs/tarantool_api.env:/app/.env
+    expose:
+      - "${TARANTOOL_API_PORT}"
+
+  postgres:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASS}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_PORT}:${POSTGRES_PORT}"
+    volumes:
+      - pgdata:/var/lib/postgresql/data1
+      - ./init_db/initPostgre/init:/docker-entrypoint-initdb.d
+
+  router:
+    build:
+      context: ./init_db/initTarantool
+      dockerfile: Dockerfile
+    environment:
+      - TARANTOOL_INSTANCE_NAME=router
+    ports:
+      - "${TARANTOOL_PORT}:${TARANTOOL_PORT}"
+    volumes:
+      - ./init_db/initTarantool/router.lua:/opt/tarantool/router.lua
+    command: tarantool /opt/tarantool/router.lua
+    depends_on:
+      - storage1
+      - storage2
+    restart: unless-stopped
+
+  storage1:
+    build:
+      context: ./init_db/initTarantool
+      dockerfile: Dockerfile
+    environment:
+      - TARANTOOL_INSTANCE_NAME=storage1
+    volumes:
+      - ./init_db/initTarantool/storage1.lua:/opt/tarantool/storage1.lua
+    command: tarantool /opt/tarantool/storage1.lua
+    healthcheck:
+      test: ["CMD", "tarantool", "-e", "os.exit(0)"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    expose:
+      - "3302"
+
+  storage2:
+    build:
+      context: ./init_db/initTarantool
+      dockerfile: Dockerfile
+    environment:
+      - TARANTOOL_INSTANCE_NAME=storage2
+    volumes:
+      - ./init_db/initTarantool/storage2.lua:/opt/tarantool/storage2.lua
+    command: tarantool /opt/tarantool/storage2.lua
+    healthcheck:
+      test: ["CMD", "tarantool", "-e", "os.exit(0)"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    expose:
+      - "3303"
+
+  redis:
+    image: redis:latest
+    volumes:
+      - redis-data:/data
+    restart: always
+    expose:
+      - "${REDIS_PORT}"
+
+  prometheus:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    volumes:
+      - ./configs/prometheus.yaml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana-oss:latest
+    restart: unless-stopped
+    ports:
+      - "${GRAFANA_PORT}:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+
+  node_exporter:
+    image: prom/node-exporter:latest
+    restart: unless-stopped
+    pid: host
+    command:
+      - '--path.procfs=/proc'
+      - '--path.sysfs=/sys'
+    expose:
+      - "9100"
+
+volumes:
+  pgdata:
+  storage1_data:
+  storage2_data:
+  redis-data:
+    driver: local
+  prometheus_data:
+  grafana_data:

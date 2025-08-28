@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"diploma/logservice"
+	"logger/logservice"
 
 	"github.com/joho/godotenv"
 	"go.uber.org/zap"

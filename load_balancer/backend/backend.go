@@ -67,6 +67,7 @@ func NewBackend(rawurl string) *backend {
 	parsedURL, err := url.Parse(rawurl)
 	if err != nil {
 		logger.Log.Error(messages.ErrInvalidBackendURL, zap.String(messages.URL, rawurl))
+		return nil
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(parsedURL)
