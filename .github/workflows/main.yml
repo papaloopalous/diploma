@@ -1,0 +1,307 @@
+name: CI/CD Pipeline
+
+
+on:
+  push:
+    branches:
+      - main
+
+
+env:
+  GO_VERSION: '1.24'
+  DOCKER_USER: ${{ secrets.DOCKER_USER }}
+  DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
+  SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+  VM_IP: ${{ secrets.VM_IP }}
+
+
+jobs:
+  build_api:
+    name: Build api
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Build
+        working-directory: ./api
+        run: |
+          go mod tidy
+          go build -v ./...
+
+
+  build_balancer:
+    name: Build balancer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Build
+        working-directory: ./load_balancer
+        run: |
+          go mod tidy
+          go build -v ./...
+
+
+  build_logger:
+    name: Build logger
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Build
+        working-directory: ./logger
+        run: |
+          go mod tidy
+          go build -v ./...
+
+
+  build_postgre_api:
+    name: Build postgre_api
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Build
+        working-directory: ./postgre_api
+        run: |
+          go mod tidy
+          go build -v ./...
+
+
+  build_tarantool_api:
+    name: Build tarantool_api
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Build
+        working-directory: ./tarantool_api
+        run: |
+          go mod tidy
+          go build -v ./...
+
+
+  lint_api:
+    name: Lint api
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Download Go modules
+        working-directory: ./api
+        run: |
+          go mod download
+          go mod tidy
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2.1.1
+          working-directory: ./api
+
+
+  lint_balancer:
+    name: Lint balancer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Download Go modules
+        working-directory: ./load_balancer
+        run: |
+          go mod download
+          go mod tidy
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2.1.1
+          working-directory: ./load_balancer
+
+
+  lint_logger:
+    name: Lint logger
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Download Go modules
+        working-directory: ./logger
+        run: |
+          go mod download
+          go mod tidy
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2.1.1
+          working-directory: ./logger
+
+
+  lint_postgre_api:
+    name: Lint postgre_api
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Download Go modules
+        working-directory: ./postgre_api
+        run: |
+          go mod download
+          go mod tidy
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2.1.1
+          working-directory: ./postgre_api
+
+
+  lint_tarantool_api:
+    name: Lint tarantool_api
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Download Go modules
+        working-directory: ./tarantool_api
+        run: |
+          go mod download
+          go mod tidy
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v7
+        with:
+          version: v2.1.1
+          working-directory: ./tarantool_api
+
+
+  deploy:
+    name: Deploy via SSH
+    needs: [build_api, build_balancer, build_logger, build_postgre_api, build_tarantool_api,
+            lint_api, lint_balancer, lint_logger, lint_postgre_api, lint_tarantool_api]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKER_USER }}
+          password: ${{ env.DOCKER_TOKEN }}
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ env.SSH_PRIVATE_KEY }}
+
+      - name: Add remote host to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H $VM_IP >> ~/.ssh/known_hosts
+
+
+      - name: Build and Push api Docker Image
+        run: |
+          cd ./api
+          docker build -f Dockerfile -t $DOCKER_USER/diploma_api:latest .
+          docker push $DOCKER_USER/diploma_api:latest
+
+      - name: Build and Push balancer Docker Image
+        run: |
+          cd ./load_balancer
+          docker build -f Dockerfile -t $DOCKER_USER/diploma_load_balancer:latest .
+          docker push $DOCKER_USER/diploma_load_balancer:latest
+
+      - name: Build and Push logger Docker Image
+        run: |
+          cd ./logger
+          docker build -f Dockerfile -t $DOCKER_USER/diploma_logger:latest .
+          docker push $DOCKER_USER/diploma_logger:latest
+
+      - name: Build and Push postgre_api Docker Image
+        run: |
+          cd ./postgre_api
+          docker build -f Dockerfile -t $DOCKER_USER/diploma_postgre_api:latest .
+          docker push $DOCKER_USER/diploma_postgre_api:latest
+
+      - name: Build and Push tarantool_api Docker Image
+        run: |
+          cd ./tarantool_api
+          docker build -f Dockerfile -t $DOCKER_USER/diploma_tarantool_api:latest .
+          docker push $DOCKER_USER/diploma_tarantool_api:latest
+
+      - name: Deploy to VM
+        run: |
+          cd ./build
+          mkdir -p configs
+          cat > .env <<EOF
+          API_PORT=${{ secrets.API_PORT }}
+          API_TIMEOUT=${{ secrets.API_TIMEOUT }}
+          API_HEALTHCHECK_INTERVAL=${{ secrets.API_HEALTHCHECK_INTERVAL }}
+          CRYPTO_PRIME=${{ secrets.CRYPTO_PRIME }}
+          CRYPTO_GENERATOR=${{ secrets.CRYPTO_GENERATOR }}
+          CRYPTO_SERVER_SECRET_KEY=${{ secrets.CRYPTO_SERVER_SECRET_KEY }}
+          SESSION_LIFETIME=${{ secrets.SESSION_LIFETIME }}
+          SESSION_HOST=${{ secrets.SESSION_HOST }}
+          SESSION_ADDR=${{ secrets.SESSION_ADDR }}
+          USER_HOST=${{ secrets.USER_HOST }}
+          USER_ADDR=${{ secrets.USER_ADDR }}
+          CHAT_HOST=${{ secrets.CHAT_HOST }}
+          CHAT_ADDR=${{ secrets.CHAT_ADDR }}
+          TASK_HOST=${{ secrets.TASK_HOST }}
+          TASK_ADDR=${{ secrets.TASK_ADDR }}
+          LOGGER_HOST=${{ secrets.LOGGER_HOST }}
+          LOGGER_PORT=${{ secrets.LOGGER_PORT }}
+          BALANCER_PORT=${{ secrets.BALANCER_PORT }}
+          API_HOST=${{ secrets.API_HOST }}
+          INTERVAL=${{ secrets.INTERVAL }}
+          REDIS_HOST=${{ secrets.REDIS_HOST }}
+          REDIS_ADDR=${{ secrets.REDIS_ADDR }}
+          MAX_TOKENS=${{ secrets.MAX_TOKENS }}
+          RATE=${{ secrets.RATE }}
+          SALT=${{ secrets.SALT }}
+          POSTGRES_HOST=${{ secrets.POSTGRES_HOST }}
+          POSTGRES_PORT=${{ secrets.POSTGRES_PORT }}
+          POSTGRES_USER=${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASS=${{ secrets.POSTGRES_PASS }}
+          POSTGRES_DB=${{ secrets.POSTGRES_DB }}
+          TARANTOOL_HOST=${{ secrets.TARANTOOL_HOST }}
+          TARANTOOL_PORT=${{ secrets.TARANTOOL_PORT }}
+          TARANTOOL_USER=${{ secrets.TARANTOOL_USER }}
+          TARANTOOL_PASS=${{ secrets.TARANTOOL_PASS }}
+          POSTGRE_API_PORT=${{ secrets.POSTGRE_API_PORT }}
+          TARANTOOL_API_PORT=${{ secrets.TARANTOOL_API_PORT }}
+          REDIS_PORT=${{ secrets.REDIS_PORT }}
+          GRAFANA_PORT=${{ secrets.GRAFANA_PORT }}
+          SCRAPE_INTERVAL=${{ secrets.SCRAPE_INTERVAL }}
+          EVALUATION_INTERVAL=${{ secrets.EVALUATION_INTERVAL }}
+          BALANCER_HOST=${{ secrets.BALANCER_HOST }}
+          EOF
+          make all
+          set -e
+          ssh ${{ secrets.VM_USER }}@$VM_IP "echo 1"
+          scp compose.yml ${{ secrets.VM_USER }}@$VM_IP:/home/diploma/
+          scp -r ./init_db ${{ secrets.VM_USER }}@$VM_IP:/home/diploma/
+          scp -r ./configs ${{ secrets.VM_USER }}@$VM_IP:/home/diploma/
+          ssh ${{ secrets.VM_USER }}@$VM_IP "cd /home/diploma && sudo mkdir -p api_logs && sudo mkdir -p balancer_logs && sudo docker-compose down || echo 'No existing Compose stack to stop'"
+          ssh ${{ secrets.VM_USER }}@$VM_IP "cd /home/diploma && sudo docker-compose pull"
+          ssh ${{ secrets.VM_USER }}@$VM_IP "cd /home/diploma && sudo docker-compose up -d"
