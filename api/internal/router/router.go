@@ -57,37 +57,37 @@ func CreateNewRouter() *mux.Router {
 	defer cancel()
 
 	// Устанавливаем соединения с микросервисами
-	userConn, err := grpc.DialContext(ctx, userAddr,
+	userConn, err := grpc.DialContext(ctx, userAddr, //nolint:staticcheck
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock())
+		grpc.WithBlock()) //nolint:staticcheck
 	if err != nil {
 		log.Fatalf("failed to connect to user service: %v", err)
 	}
 
-	chatConn, err := grpc.DialContext(ctx, chatAddr,
+	chatConn, err := grpc.DialContext(ctx, chatAddr, //nolint:staticcheck
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock())
+		grpc.WithBlock()) //nolint:staticcheck
 	if err != nil {
 		log.Fatalf("failed to connect to chat service: %v", err)
 	}
 
-	sessionConn, err := grpc.DialContext(ctx, sessionAddr,
+	sessionConn, err := grpc.DialContext(ctx, sessionAddr, //nolint:staticcheck
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock())
+		grpc.WithBlock()) //nolint:staticcheck
 	if err != nil {
 		log.Fatalf("failed to connect to session service: %v", err)
 	}
 
-	taskConn, err := grpc.DialContext(ctx, taskAddr,
+	taskConn, err := grpc.DialContext(ctx, taskAddr, //nolint:staticcheck
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock())
+		grpc.WithBlock()) //nolint:staticcheck
 	if err != nil {
 		log.Fatalf("failed to connect to task service: %v", err)
 	}
 
-	loggerConn, err := grpc.DialContext(ctx, loggerAddr,
+	loggerConn, err := grpc.DialContext(ctx, loggerAddr, //nolint:staticcheck
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock())
+		grpc.WithBlock()) //nolint:staticcheck
 	if err != nil {
 		log.Printf("failed to connect to logger service: %v", err)
 	}
@@ -144,7 +144,7 @@ func CreateNewRouter() *mux.Router {
 
 	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("statusOK"))
+		w.Write([]byte("statusOK")) //nolint:errcheck
 	}).Methods("GET")
 
 	// Настраиваем раздачу статических файлов

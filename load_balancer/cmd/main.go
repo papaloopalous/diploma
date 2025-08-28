@@ -34,7 +34,7 @@ func init() {
 
 func main() {
 	metrics.Init()
-	defer logger.Log.Sync()
+	defer logger.Log.Sync() //nolint:errcheck
 	serverAddr, backendAddr, interval, dbAddr, salt, defaultMaxTokens, defaultRate := configloading.SetParams()
 
 	rl := ratelimiter.NewBucket(dbAddr, defaultMaxTokens, defaultRate)

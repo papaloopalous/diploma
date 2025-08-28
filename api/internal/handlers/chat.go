@@ -156,7 +156,7 @@ func (h *ChatHandler) HandleConnection(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	defer conn.Close()
+	defer conn.Close() //nolint:errcheck
 
 	// Создание или получение комнаты
 	roomsMu.Lock()

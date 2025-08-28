@@ -38,7 +38,11 @@ func (s *server) GetSession(ctx context.Context, req *sessionpb.SessionIDRequest
 	expiresAt := int64(tuple[3].(uint64))
 
 	if time.Now().Unix() > expiresAt {
-		s.db.Delete("sessions", "primary", []interface{}{req.SessionId})
+		_, err := s.db.Delete("sessions", "primary", []interface{}{req.SessionId})
+		if err != nil {
+			log.Printf("Failed to delete session: %v", err)
+			return nil, err
+		}
 		return nil, errors.New("session expired")
 	}
 

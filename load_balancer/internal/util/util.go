@@ -16,7 +16,7 @@ func CopyHeadersAndBody(w http.ResponseWriter, recorder *httptest.ResponseRecord
 		headers[k] = vs
 	}
 	w.WriteHeader(recorder.Code)
-	recorder.Body.WriteTo(w)
+	recorder.Body.WriteTo(w) //nolint:errcheck
 }
 
 // вспомогательная функция для кодирования ip пользователя
